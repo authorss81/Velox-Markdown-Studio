@@ -53,7 +53,7 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-export function generateStandaloneHtml(filename: string, markdownContent: string, htmlBody: string): string {
+export function generateStandaloneHtml(filename: string, htmlBody: string): string {
   // The filename reaches this template from the document being previewed, so a
   // name containing "</title><script>…" would otherwise break out of the title.
   const cleanTitle = escapeHtml(filename.replace(/\.md$/i, ''));
@@ -96,8 +96,8 @@ export function generateStandaloneHtml(filename: string, markdownContent: string
 </html>`;
 }
 
-export function exportDocumentAsHtml(filename: string, markdownContent: string, htmlBody: string) {
+export function exportDocumentAsHtml(filename: string, htmlBody: string) {
   const cleanTitle = filename.replace(/\.md$/i, '').replace(/[\\/:*?"<>|]/g, '_');
-  const htmlDoc = generateStandaloneHtml(filename, markdownContent, htmlBody);
+  const htmlDoc = generateStandaloneHtml(filename, htmlBody);
   return downloadTextFile(`${cleanTitle}.html`, htmlDoc, 'text/html');
 }

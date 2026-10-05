@@ -37,13 +37,19 @@ function buildSampleRecords(): MarkdownFileRecord[] {
 }
 
 export async function getRecentFiles(): Promise<MarkdownFileRecord[]> {
-  let alreadyInitialised = false;
+  // A read must never throw because a *write* failed. If storage is
+  // unavailable the app degrades to an empty library and surfaces the problem on
+  // the next save, rather than the whole Home view failing to populate.
+  let readable = true;
 
   try {
     const initialised = await get<boolean>(STORAGE_KEYS.INITIALIZED);
-    alreadyInitialised = initialised === true;
+    if (initialised === true) {
+      // Fine: the library exists and may legitimately be empty.
+      readable = true;
+    }
   } catch {
-    // Fall through; the record read below is authoritative.
+    readable = false;
   }
 
   try {
@@ -56,6 +62,7 @@ export async function getRecentFiles(): Promise<MarkdownFileRecord[]> {
     }
   } catch (err) {
     console.warn('Failed to load recent files from IDB, using localStorage fallback', err);
+    readable = false;
     const local = localStorage.getItem(STORAGE_KEYS.RECENT_FILES);
     if (local) {
       try {
@@ -67,16 +74,26 @@ export async function getRecentFiles(): Promise<MarkdownFileRecord[]> {
     }
   }
 
-  // Only seed a genuine first run. Once initialised, an absent record means the
-  // library was emptied and must stay empty.
+  // Only seed a genuine first run, and only when we could actually read the
+  // store. If the read failed we do not know whether this is a first run, so we
+  // must not write.
+  if (!readable) return [];
+
+  let alreadyInitialised = false;
+  try {
+    alreadyInitialised = (await get<boolean>(STORAGE_KEYS.INITIALIZED)) === true;
+  } catch {
+    return [];
+  }
   if (alreadyInitialised) return [];
 
   const initialFiles = buildSampleRecords();
-  await saveAllRecentFiles(initialFiles);
   try {
-    await set(STORAGE_KEYS.INITIALIZED, true);
+    await saveAllRecentFiles(initialFiles);
   } catch (err) {
-    console.warn('Could not persist initialisation flag', err);
+    // Still hand back the samples so the app is usable, even though they could
+    // not be persisted.
+    console.warn('Could not persist the starter documents', err);
   }
   return initialFiles;
 }
@@ -194,17 +211,19 @@ export async function saveFileRecordImpl(
   let updatedList: MarkdownFileRecord[];
   if (existingIdx >= 0) {
     updatedList = [...current];
+    const existing = updatedList[existingIdx];
     // A merge must never change identity, otherwise any tab holding the old id
     // can never resolve its record again and silently becomes unopenable.
     updatedList[existingIdx] = {
-      ...updatedList[existingIdx],
+      ...existing,
       ...updatedRecord,
-      id: updatedList[existingIdx].id,
-      // Preserve user intent unless the caller explicitly changed it.
-      isPinned: updatedRecord.isPinned ?? updatedList[existingIdx].isPinned,
-      tags: updatedRecord.tags?.length
-        ? updatedRecord.tags
-        : (updatedList[existingIdx].tags ?? []),
+      id: existing.id,
+      // `isPinned` is owned by the existing record. Every caller's default is
+      // `false`, so taking it from the incoming record silently unpinned the
+      // document on any ordinary save. togglePin is the only thing allowed to
+      // change it.
+      isPinned: existing.isPinned,
+      tags: updatedRecord.tags?.length ? updatedRecord.tags : (existing.tags ?? []),
     };
   } else {
     updatedList = [updatedRecord, ...current];

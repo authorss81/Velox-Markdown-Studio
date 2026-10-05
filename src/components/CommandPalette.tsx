@@ -9,7 +9,7 @@ import {
   Eye,
   Code,
   Columns2,
-  Download,
+
   Printer,
   Sparkles,
   Keyboard,

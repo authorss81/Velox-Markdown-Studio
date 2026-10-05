@@ -8,3 +8,4 @@ coverage/
 release/
 dev-dist/
 *.tsbuildinfo
+scripts/smoke-report.txt

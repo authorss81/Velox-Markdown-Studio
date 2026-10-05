@@ -1,0 +1,180 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8" /><title>bridge test</title></head>
+  <body>
+    <script>
+      // Runs inside a real renderer with the real preload attached. Exercises the
+      // whole chain: contextBridge -> ipcRenderer -> ipcMain -> filesystem.
+      window.runTests = async (paths) => {
+        const results = [];
+        const record = (name, pass, detail) => results.push({ name, pass: !!pass, detail: detail ?? '' });
+
+        record('bridge present', window.velox && window.velox.isElectron === true, JSON.stringify(Object.keys(window.velox || {})));
+        record('no ipcRenderer leaked', typeof window.ipcRenderer === 'undefined' && typeof window.require === 'undefined');
+        record('no node globals leaked', typeof window.process === 'undefined');
+
+        const fs = window.velox.fs;
+
+        // --- open-path on a real .md -------------------------------------
+        try {
+          const doc = await fs.openPath(paths.md);
+          record('openPath returns content', doc.content === paths.expected, JSON.stringify(doc.content));
+          record('openPath returns absolute path', doc.path === paths.md, doc.path);
+          record('openPath returns name', doc.name === 'note.md', doc.name);
+        } catch (e) {
+          record('openPath returns content', false, String(e));
+        }
+
+        // --- save in place, then verify the BYTES on disk ----------------
+        try {
+          const res = await fs.save(paths.md, paths.newContent);
+          record('save reports ok', res.ok === true, JSON.stringify(res));
+          record('save reports byte count', res.bytes === new TextEncoder().encode(paths.newContent).length, String(res.bytes));
+        } catch (e) {
+          record('save reports ok', false, String(e));
+        }
+
+        // --- read back through the bridge -------------------------------
+        try {
+          const back = await fs.read(paths.md);
+          record('read returns saved content', back === paths.newContent, JSON.stringify(back));
+        } catch (e) {
+          record('read returns saved content', false, String(e));
+        }
+
+        // --- CRLF preservation ------------------------------------------
+        try {
+          await fs.save(paths.md, 'line1\r\nline2\r\nline3');
+          const back = await fs.read(paths.md);
+          record('CRLF preserved verbatim', back === 'line1\r\nline2\r\nline3', JSON.stringify(back));
+        } catch (e) {
+          record('CRLF preserved verbatim', false, String(e));
+        }
+
+        // --- unicode ----------------------------------------------------
+        try {
+          const uni = '# Título — 日本語 — emoji 🎉\n\nçà';
+          await fs.save(paths.md, uni);
+          const back = await fs.read(paths.md);
+          record('unicode round trips', back === uni, JSON.stringify(back));
+        } catch (e) {
+          record('unicode round trips', false, String(e));
+        }
+
+        // --- stat -------------------------------------------------------
+        try {
+          const s = await fs.stat(paths.md);
+          record('stat reports exists', s.exists === true && s.size > 0, JSON.stringify(s));
+        } catch (e) {
+          record('stat reports exists', false, String(e));
+        }
+
+        // --- AUTHORIZATION: a path the user never chose must be refused --
+        try {
+          await fs.save(paths.unauthorized, 'pwned');
+          record('unauthorized save refused', false, 'it SUCCEEDED - renderer has arbitrary write');
+        } catch (e) {
+          record('unauthorized save refused', /not authorised/i.test(String(e)), String(e));
+        }
+        try {
+          await fs.read(paths.unauthorized);
+          record('unauthorized read refused', false, 'it SUCCEEDED');
+        } catch (e) {
+          record('unauthorized read refused', /not authorised/i.test(String(e)), String(e));
+        }
+
+        // --- extension allowlist ----------------------------------------
+        try {
+          await fs.openPath(paths.exe);
+          record('non-markdown extension refused', false, 'it SUCCEEDED');
+        } catch (e) {
+          record('non-markdown extension refused', /Unsupported file type/i.test(String(e)), String(e));
+        }
+
+        // --- missing file ------------------------------------------------
+        try {
+          await fs.openPath(paths.missing);
+          record('missing file refused', false, 'it SUCCEEDED');
+        } catch (e) {
+          record('missing file refused', true, String(e));
+        }
+
+        // --- size cap ----------------------------------------------------
+        try {
+          await fs.openPath(paths.huge);
+          record('oversized file refused', false, 'it SUCCEEDED');
+        } catch (e) {
+          record('oversized file refused', /too large/i.test(String(e)), String(e));
+        }
+
+        // --- relative path refused ---------------------------------------
+        try {
+          await fs.openPath('note.md');
+          record('relative path refused', false, 'it SUCCEEDED');
+        } catch (e) {
+          record('relative path refused', /relative/i.test(String(e)), String(e));
+        }
+
+        // --- non-string content refused ----------------------------------
+        try {
+          await fs.save(paths.md, { evil: true });
+          record('non-string save refused', false, 'it SUCCEEDED');
+        } catch (e) {
+          record('non-string save refused', /non-text/i.test(String(e)), String(e));
+        }
+
+        // --- window handlers must not throw ------------------------------
+        try {
+          await window.velox.window.isMaximized();
+          record('window:is-maximized responds', true);
+        } catch (e) {
+          record('window:is-maximized responds', false, String(e));
+        }
+        try {
+          const un = window.velox.window.onMaximizeChange(() => {});
+          record('onMaximizeChange returns unsubscribe', typeof un === 'function');
+          un();
+        } catch (e) {
+          record('onMaximizeChange returns unsubscribe', false, String(e));
+        }
+
+        // --- title bar overlay theming ----------------------------------
+        try {
+          const ok = await window.velox.window.setTitleBarOverlay({
+            color: '#ffffff', symbolColor: '#0f172a', height: 42,
+          });
+          record('setTitleBarOverlay applies', ok === true, String(ok));
+          const ok2 = await window.velox.window.setTitleBarOverlay({
+            color: '#0f172a', symbolColor: '#cbd5e1', height: 42,
+          });
+          record('setTitleBarOverlay re-applies', ok2 === true, String(ok2));
+        } catch (e) {
+          record('setTitleBarOverlay applies', false, String(e));
+        }
+
+        // --- overlay geometry tokens must resolve ------------------------
+        try {
+          const probe = document.createElement('div');
+          probe.style.cssText = 'position:fixed;top:0;left:0;height:var(--velox-titlebar-height,42px);padding-right:var(--velox-caption-reserve,140px)';
+          document.body.appendChild(probe);
+          const cs = getComputedStyle(probe);
+          record('titlebar height token resolves', parseFloat(cs.height) > 20, cs.height);
+          record('caption reserve >= 138px', parseFloat(cs.paddingRight) >= 138, cs.paddingRight);
+          probe.remove();
+        } catch (e) {
+          record('titlebar height token resolves', false, String(e));
+        }
+        // --- pathForFile on a synthetic File must not leak a path --------
+        try {
+          const synthetic = new File(['x'], 'fake.md');
+          const p = window.velox.pathForFile(synthetic);
+          record('pathForFile(synthetic) is empty', p === '', JSON.stringify(p));
+        } catch (e) {
+          record('pathForFile(synthetic) is empty', false, String(e));
+        }
+
+        return results;
+      };
+    </script>
+  </body>
+</html>

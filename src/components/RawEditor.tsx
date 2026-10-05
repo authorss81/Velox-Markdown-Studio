@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
-import { Search, X, ArrowUp, ArrowDown, Replace, Check } from 'lucide-react';
+import { Search, X, ArrowUp, ArrowDown, Replace } from 'lucide-react';
 
 export interface RawEditorHandle {
   insertText: (prefix: string, suffix?: string, defaultText?: string) => void;

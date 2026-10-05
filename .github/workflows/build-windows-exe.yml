@@ -36,9 +36,17 @@ jobs:
         run: |
           npm run lint
 
+      - name: Unit and integration tests
+        run: |
+          npm test
+
       - name: Build web application
         run: |
           npm run build
+
+      - name: Electron smoke test (preload bridge, IPC, filesystem)
+        run: |
+          npm run test:electron
 
       - name: Package Windows Executable (.exe)
         run: |

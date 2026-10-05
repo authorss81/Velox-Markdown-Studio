@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Keyboard, Search, Sparkles, Command } from 'lucide-react';
+import { X, Keyboard, Search } from 'lucide-react';
 
 interface ShortcutsModalProps {
   isOpen: boolean;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ZoomIn, ZoomOut, Download, Copy, Check } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Copy, Check } from 'lucide-react';
 
 interface ImageLightboxModalProps {
   imageSrc: string | null;

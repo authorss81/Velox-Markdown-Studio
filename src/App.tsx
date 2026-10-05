@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { TitleBar } from './components/TitleBar';
 import { TabBar } from './components/TabBar';
@@ -17,6 +17,8 @@ import { CommandPalette } from './components/CommandPalette';
 import { SampleFilesModal } from './components/SampleFilesModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { ExportModal } from './components/ExportModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { PreviewFallback } from './components/PreviewFallback';
 import {
   getRecentFiles,
   saveFileRecord,
@@ -929,7 +931,6 @@ export default function App() {
       <CommandBar
         viewMode={activeTab?.viewMode || 'preview'}
         theme={theme}
-        fontSize={fontSize}
         wordWrap={wordWrap}
         syncScroll={syncScroll}
         onToggleSyncScroll={() => {
@@ -1007,13 +1008,30 @@ export default function App() {
             {/* View Mode: Preview Only */}
             {activeTab.viewMode === 'preview' && (
               <div className={`h-full w-full ${isLight ? 'bg-white' : 'bg-slate-950'}`}>
-                <MarkdownPreview
-                  content={activeTab.content}
-                  fontSize={fontSize}
-                  theme={theme}
-                  onContentChange={handleContentChange}
-                  onImageClick={(src, alt) => setLightboxImage({ src, alt })}
-                />
+                {/* The preview is the most likely thing to throw, since it parses
+                    untrusted markdown. Contained here so a bad document costs the
+                    preview, not the tab and its unsaved edits. The fallback offers
+                    the raw editor so the user is never stranded. */}
+                <ErrorBoundary
+                  label="Preview"
+                  fallback={(_error, reset) => (
+                    <PreviewFallback
+                      onSwitchToRaw={() => {
+                        handleChangeViewMode('split');
+                        reset();
+                      }}
+                      onRetry={reset}
+                    />
+                  )}
+                >
+                  <MarkdownPreview
+                    content={activeTab.content}
+                    fontSize={fontSize}
+                    theme={theme}
+                    onContentChange={handleContentChange}
+                    onImageClick={(src, alt) => setLightboxImage({ src, alt })}
+                  />
+                </ErrorBoundary>
               </div>
             )}
 
@@ -1035,15 +1053,22 @@ export default function App() {
                   />
                 </div>
                 <div className={`w-1/2 h-full ${isLight ? 'bg-white' : 'bg-slate-950'}`}>
-                  <MarkdownPreview
-                    ref={previewRef}
-                    content={activeTab.content}
-                    fontSize={fontSize}
-                    theme={theme}
-                    onContentChange={handleContentChange}
-                    onScrollPercentage={handlePreviewScrollPercentage}
-                    onImageClick={(src, alt) => setLightboxImage({ src, alt })}
-                  />
+                  <ErrorBoundary
+                    label="Preview"
+                    fallback={(_error, reset) => (
+                      <PreviewFallback onSwitchToRaw={() => handleChangeViewMode('raw')} onRetry={reset} />
+                    )}
+                  >
+                    <MarkdownPreview
+                      ref={previewRef}
+                      content={activeTab.content}
+                      fontSize={fontSize}
+                      theme={theme}
+                      onContentChange={handleContentChange}
+                      onScrollPercentage={handlePreviewScrollPercentage}
+                      onImageClick={(src, alt) => setLightboxImage({ src, alt })}
+                    />
+                  </ErrorBoundary>
                 </div>
               </div>
             )}
@@ -1072,43 +1097,50 @@ export default function App() {
       />
 
       {/* Export Modal with Download, HTML, and Copy options */}
-      <ExportModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        fileName={activeTab?.name || 'document.md'}
-        markdownContent={activeTab?.content || ''}
-        theme={theme}
-      />
+      <ErrorBoundary label="Export dialog">
+        <ExportModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          fileName={activeTab?.name || 'document.md'}
+          markdownContent={activeTab?.content || ''}
+          theme={theme}
+        />
+      </ErrorBoundary>
 
       {/* Command Palette */}
-      <CommandPalette
-        isOpen={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
-        recentFiles={recentFiles}
-        theme={theme}
-        onOpenFileById={(fileId) => handleOpenFileById(fileId)}
-        onNewFile={handleNewFile}
-        onOpenFile={handleOpenLocalFile}
-        onSave={handleSave}
-        onSaveAs={handleSaveAs}
-        onChangeViewMode={handleChangeViewMode}
-        onOpenSampleLibrary={() => setShowSampleLibrary(true)}
-        onOpenShortcuts={() => setShowShortcuts(true)}
-        onPrintPdf={() => setShowExportModal(true)}
-      />
+      <ErrorBoundary label="Command palette">
+        <CommandPalette
+          isOpen={showCommandPalette}
+          onClose={() => setShowCommandPalette(false)}
+          recentFiles={recentFiles}
+          theme={theme}
+          onOpenFileById={(fileId) => handleOpenFileById(fileId)}
+          onNewFile={handleNewFile}
+          onOpenFile={handleOpenLocalFile}
+          onSave={handleSave}
+          onSaveAs={handleSaveAs}
+          onChangeViewMode={handleChangeViewMode}
+          onOpenSampleLibrary={() => setShowSampleLibrary(true)}
+          onOpenShortcuts={() => setShowShortcuts(true)}
+          onPrintPdf={() => setShowExportModal(true)}
+        />
+      </ErrorBoundary>
 
       {/* Shortcuts Reference Modal */}
-      <ShortcutsModal
-        isOpen={showShortcuts}
-        onClose={() => setShowShortcuts(false)}
-        theme={theme}
-      />
+      <ErrorBoundary label="Shortcuts dialog">
+        <ShortcutsModal
+          isOpen={showShortcuts}
+          onClose={() => setShowShortcuts(false)}
+          theme={theme}
+        />
+      </ErrorBoundary>
 
       {/* Sample Files Modal */}
-      <SampleFilesModal
-        isOpen={showSampleLibrary}
-        onClose={() => setShowSampleLibrary(false)}
-        onSelectSample={async (sampleId) => {
+      <ErrorBoundary label="Sample library">
+        <SampleFilesModal
+          isOpen={showSampleLibrary}
+          onClose={() => setShowSampleLibrary(false)}
+          onSelectSample={async (sampleId) => {
           const sample = SAMPLE_FILES.find((s) => s.id === sampleId);
           if (!sample) return;
 
@@ -1137,14 +1169,17 @@ export default function App() {
             showToast(`Could not open "${sample.name}": document storage unavailable`);
           }
         }}
-      />
+        />
+      </ErrorBoundary>
 
       {/* Image Lightbox Modal */}
-      <ImageLightboxModal
-        imageSrc={lightboxImage?.src || null}
-        imageAlt={lightboxImage?.alt || ''}
-        onClose={() => setLightboxImage(null)}
-      />
+      <ErrorBoundary label="Image viewer">
+        <ImageLightboxModal
+          imageSrc={lightboxImage?.src || null}
+          imageAlt={lightboxImage?.alt || ''}
+          onClose={() => setLightboxImage(null)}
+        />
+      </ErrorBoundary>
     </div>
   );
 }

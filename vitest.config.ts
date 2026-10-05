@@ -1,5 +1,4 @@
 import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'url';
 
 /**
@@ -9,15 +8,20 @@ import { fileURLToPath } from 'url';
  * native dialogs, the window controls overlay) are covered separately by
  * scripts/electron-smoke.cjs, which launches a real Electron process.
  *
- * Two dependencies are load-bearing and easy to break by accident:
+ * Two things are load-bearing and easy to break by accident:
  *  - `environment: jsdom`, because DOMPurify silently degrades to a no-op
  *    passthrough when createNodeIterator is missing. Under a lesser DOM the XSS
- *    tests would pass while proving nothing. smoke-only guards live in the suite.
+ *    tests would pass while proving nothing; src/test/setup.ts asserts the
+ *    capability loudly so the suite cannot pass vacuously.
  *  - `setupFiles`, which installs fake-indexeddb before the storage module is
  *    imported.
+ *
+ * Note: no @vitejs/plugin-react here. It is only needed for Fast Refresh, and
+ * vitest ships its own nested Vite whose plugin types clash with this repo's
+ * rolldown-based Vite 8. JSX still compiles, via the automatic runtime that
+ * tsconfig.json already selects.
  */
 export default defineConfig({
-  plugins: [react()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('.', import.meta.url)) },
   },
@@ -26,7 +30,6 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
-    // The Electron smoke suite is a separate process, never picked up here.
     exclude: ['node_modules/**', 'dist/**', 'release/**'],
     restoreMocks: true,
   },

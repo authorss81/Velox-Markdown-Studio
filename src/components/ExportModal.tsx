@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, FileDown, Code, Copy, Check, Printer, FileText, Sparkles } from 'lucide-react';
+import { X, FileDown, Code, Copy, Check, Printer, FileText } from 'lucide-react';
 import { downloadTextFile, generateStandaloneHtml } from '../services/export';
 import { parseMarkdown } from '../services/markdown';
 
@@ -24,7 +24,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   const htmlContent = React.useMemo(() => {
     const body = parseMarkdown(markdownContent);
-    return generateStandaloneHtml(fileName, markdownContent, body);
+    return generateStandaloneHtml(fileName, body);
   }, [fileName, markdownContent]);
 
   if (!isOpen) return null;

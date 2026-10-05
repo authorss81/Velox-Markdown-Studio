@@ -18,7 +18,7 @@ import {
   Table as TableIcon,
   Image as ImageIcon,
   Link as LinkIcon,
-  Printer,
+
   WrapText,
   ZoomIn,
   ZoomOut,
@@ -31,7 +31,6 @@ import { ViewMode } from '../types';
 interface CommandBarProps {
   viewMode: ViewMode;
   theme?: 'dark' | 'light';
-  fontSize?: number;
   wordWrap?: boolean;
   syncScroll?: boolean;
   onToggleSyncScroll?: () => void;
@@ -54,7 +53,6 @@ interface CommandBarProps {
 export const CommandBar: React.FC<CommandBarProps> = ({
   viewMode,
   theme = 'dark',
-  fontSize = 16,
   wordWrap = true,
   syncScroll = true,
   onToggleSyncScroll,

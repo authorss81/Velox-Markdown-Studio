@@ -101,8 +101,9 @@ export function ensureLanguages(): Promise<void> {
       try {
         const mod = await load();
         const grammar = typeof mod === 'function' ? mod : mod.default;
-        if (typeof grammar === 'function' && !hljs.getLanguage(name)) {
+        if (typeof grammar === 'function' && !registered.has(name)) {
           hljs.registerLanguage(name, grammar);
+          registered.add(name);
         }
       } catch (err) {
         // A missing grammar must never break rendering; the block simply falls
@@ -115,13 +116,22 @@ export function ensureLanguages(): Promise<void> {
   return ready;
 }
 
+/**
+ * Names actually registered on the hljs instance.
+ *
+ * `hljs.getLanguage()` looks a name up in a plain object, so an inherited key
+ * such as "constructor", "toString" or "__proto__" resolves truthy without being
+ * a real grammar. Membership of this set is the only reliable check.
+ */
+const registered = new Set<string>();
+
 /** True when this fence's info string names a grammar we can actually apply. */
 export function isHighlightable(lang: string | undefined): boolean {
   if (!lang) return false;
   const requested = lang.trim().split(/\s+/)[0];
   if (!requested || !SAFE_LANG.test(requested)) return false;
   const resolved = ALIASES[requested.toLowerCase()] ?? requested.toLowerCase();
-  return resolved !== 'plaintext' && hljs.getLanguage(resolved) !== undefined;
+  return resolved !== 'plaintext' && registered.has(resolved);
 }
 
 /**
