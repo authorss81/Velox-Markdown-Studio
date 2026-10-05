@@ -22,10 +22,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [copiedType, setCopiedType] = useState<'md' | 'html' | null>(null);
   const isLight = theme === 'light';
 
+  // Gated on isOpen. This memo sat above `if (!isOpen) return null`, so it ran on
+  // every keystroke for a dialog nobody could see - a second full parse of the
+  // document plus a complete standalone-HTML string build, doubling the preview's
+  // cost for nothing. The guard has to live inside the memo rather than as an
+  // early return, because hooks must not be called conditionally.
   const htmlContent = React.useMemo(() => {
-    const body = parseMarkdown(markdownContent);
-    return generateStandaloneHtml(fileName, body);
-  }, [fileName, markdownContent]);
+    if (!isOpen) return '';
+    return generateStandaloneHtml(fileName, parseMarkdown(markdownContent));
+  }, [isOpen, fileName, markdownContent]);
 
   if (!isOpen) return null;
 

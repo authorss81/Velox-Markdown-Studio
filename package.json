@@ -53,7 +53,41 @@
       "installerIcon": "public/favicon.ico",
       "uninstallerIcon": "public/favicon.ico",
       "installerHeaderIcon": "public/favicon.ico"
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": "md",
+        "name": "MarkdownDocument",
+        "description": "Markdown Document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "icon": "public/favicon.ico"
+      },
+      {
+        "ext": "markdown",
+        "name": "MarkdownDocument",
+        "description": "Markdown Document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "icon": "public/favicon.ico"
+      },
+      {
+        "ext": "mdown",
+        "name": "MarkdownDocument",
+        "description": "Markdown Document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "icon": "public/favicon.ico"
+      },
+      {
+        "ext": "mkd",
+        "name": "MarkdownDocument",
+        "description": "Markdown Document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "icon": "public/favicon.ico"
+      }
+    ]
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

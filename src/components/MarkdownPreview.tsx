@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { parseMarkdown } from '../services/markdown';
 import { ensureLanguages } from '../services/highlight';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 export interface MarkdownPreviewHandle {
   scrollToPercentage: (percentage: number) => void;
@@ -41,7 +42,19 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     };
   }, []);
 
-  const htmlContent = React.useMemo(() => parseMarkdown(content), [content, grammarEpoch]);
+  // Parse on a debounce, not on every keystroke.
+  //
+  // The memo below used to depend directly on `content`, so its cache hit rate was
+  // zero: every character re-ran marked, re-ran the highlighter, and replaced the
+  // entire preview DOM subtree (which also resets scroll). On a long document that
+  // is 100-300ms per keystroke. The editor stays instant; only the render lags by
+  // a fraction of a second.
+  const debouncedContent = useDebouncedValue(content, 180);
+
+  const htmlContent = React.useMemo(
+    () => parseMarkdown(debouncedContent),
+    [debouncedContent, grammarEpoch]
+  );
 
   // Expose imperative scrollToPercentage
   useImperativeHandle(ref, () => ({

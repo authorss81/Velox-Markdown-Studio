@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   FileText,
@@ -15,6 +15,8 @@ import {
   Keyboard,
 } from 'lucide-react';
 import { MarkdownFileRecord, ViewMode } from '../types';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { filterFilesByQuery } from '../services/search';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -58,99 +60,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }
   }, [isOpen]);
 
-  const items = useMemo(() => {
-    const q = query.toLowerCase();
-
-    // 1. Matched files from permanent memory
-    const matchedFiles = recentFiles
-      .filter((f) => f.name.toLowerCase().includes(q) || f.content.toLowerCase().includes(q))
-      .slice(0, 5)
-      .map((f) => ({
-        id: `file-${f.id}`,
-        title: f.name,
-        subtitle: f.path || `${f.wordCount} words • ${f.tags.join(', ')}`,
-        icon: <FileText className="w-4 h-4 text-sky-500" />,
-        action: () => onOpenFileById(f.id),
-      }));
-
-    // 2. Commands
-    const commands = [
-      {
-        id: 'cmd-shortcuts',
-        title: 'Keyboard Shortcuts Reference',
-        subtitle: 'View all keyboard shortcuts (Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+K)',
-        icon: <Keyboard className="w-4 h-4 text-sky-500" />,
-        action: () => onOpenShortcuts?.(),
-      },
-      {
-        id: 'cmd-new',
-        title: 'New Markdown Document',
-        subtitle: 'Create a new empty markdown file (Ctrl+N)',
-        icon: <FilePlus className="w-4 h-4 text-emerald-500" />,
-        action: onNewFile,
-      },
-      {
-        id: 'cmd-open',
-        title: 'Open File from Windows...',
-        subtitle: 'Pick any .md file from your computer (Ctrl+O)',
-        icon: <FolderOpen className="w-4 h-4 text-amber-500" />,
-        action: onOpenFile,
-      },
-      {
-        id: 'cmd-save',
-        title: 'Save Current File',
-        subtitle: 'Commit changes back to Windows disk (Ctrl+S)',
-        icon: <Save className="w-4 h-4 text-sky-500" />,
-        action: onSave,
-      },
-      {
-        id: 'cmd-saveas',
-        title: 'Save As Another File...',
-        subtitle: 'Save to a new location in Windows (Ctrl+Shift+S)',
-        icon: <FileDown className="w-4 h-4 text-emerald-500" />,
-        action: onSaveAs,
-      },
-      {
-        id: 'cmd-preview',
-        title: 'Switch to Preview Mode',
-        subtitle: 'Render formatted markdown with syntax highlighting',
-        icon: <Eye className="w-4 h-4 text-sky-500" />,
-        action: () => onChangeViewMode('preview'),
-      },
-      {
-        id: 'cmd-raw',
-        title: 'Switch to Raw Code Editor',
-        subtitle: 'Edit markdown source text in monospaced editor',
-        icon: <Code className="w-4 h-4 text-purple-500" />,
-        action: () => onChangeViewMode('raw'),
-      },
-      {
-        id: 'cmd-split',
-        title: 'Switch to Split Dual View',
-        subtitle: 'Side-by-side live editor and rendered preview',
-        icon: <Columns2 className="w-4 h-4 text-indigo-500" />,
-        action: () => onChangeViewMode('split'),
-      },
-      {
-        id: 'cmd-print',
-        title: 'Print / Save as PDF...',
-        subtitle: 'Print formatted document or export to PDF (Ctrl+P)',
-        icon: <Printer className="w-4 h-4 text-amber-500" />,
-        action: onPrintPdf,
-      },
-      {
-        id: 'cmd-samples',
-        title: 'Browse Sample Markdown Library',
-        subtitle: 'Templates, syntax cheatsheets, and guides',
-        icon: <Sparkles className="w-4 h-4 text-amber-500" />,
-        action: onOpenSampleLibrary,
-      },
-    ].filter((c) => c.title.toLowerCase().includes(q) || c.subtitle.toLowerCase().includes(q));
-
-    return [...matchedFiles, ...commands];
-  }, [
-    query,
-    recentFiles,
+  // The callbacks below are recreated by App on every render, so listing them in
+  // the useMemo dependency array meant the memo was invalidated by *any* state
+  // change anywhere in the app - it was providing no caching at all. Holding them
+  // in a ref lets the memo depend only on what actually affects its output.
+  const actions = useRef({
     onOpenFileById,
     onNewFile,
     onOpenFile,
@@ -160,7 +74,114 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     onOpenSampleLibrary,
     onPrintPdf,
     onOpenShortcuts,
-  ]);
+  });
+  actions.current = {
+    onOpenFileById,
+    onNewFile,
+    onOpenFile,
+    onSave,
+    onSaveAs,
+    onChangeViewMode,
+    onOpenSampleLibrary,
+    onPrintPdf,
+    onOpenShortcuts,
+  };
+
+  // Debounced so a burst of keystrokes filters once rather than once per letter.
+  const debouncedQuery = useDebouncedValue(query, 120);
+
+  const items = useMemo(() => {
+    const q = debouncedQuery.toLowerCase();
+
+    // 1. Matched files from permanent memory.
+    // filterFilesByQuery reuses the cached lowercase projection instead of
+    // allocating a lowercase copy of every document on every keystroke.
+    const matchedFiles = filterFilesByQuery(recentFiles, q, 5).map((f) => ({
+      id: `file-${f.id}`,
+      title: f.name,
+      subtitle: f.path || `${f.wordCount} words • ${f.tags.join(', ')}`,
+      icon: <FileText className="w-4 h-4 text-sky-500" />,
+      action: () => actions.current.onOpenFileById(f.id),
+    }));
+
+    // 2. Commands
+    const commands = [
+      {
+        id: 'cmd-shortcuts',
+        title: 'Keyboard Shortcuts Reference',
+        subtitle: 'View all keyboard shortcuts (Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+K)',
+        icon: <Keyboard className="w-4 h-4 text-sky-500" />,
+        action: () => actions.current.onOpenShortcuts?.(),
+      },
+      {
+        id: 'cmd-new',
+        title: 'New Markdown Document',
+        subtitle: 'Create a new empty markdown file (Ctrl+N)',
+        icon: <FilePlus className="w-4 h-4 text-emerald-500" />,
+        action: actions.current.onNewFile,
+      },
+      {
+        id: 'cmd-open',
+        title: 'Open File from Windows...',
+        subtitle: 'Pick any .md file from your computer (Ctrl+O)',
+        icon: <FolderOpen className="w-4 h-4 text-amber-500" />,
+        action: actions.current.onOpenFile,
+      },
+      {
+        id: 'cmd-save',
+        title: 'Save Current File',
+        subtitle: 'Commit changes back to Windows disk (Ctrl+S)',
+        icon: <Save className="w-4 h-4 text-sky-500" />,
+        action: actions.current.onSave,
+      },
+      {
+        id: 'cmd-saveas',
+        title: 'Save As Another File...',
+        subtitle: 'Save to a new location in Windows (Ctrl+Shift+S)',
+        icon: <FileDown className="w-4 h-4 text-emerald-500" />,
+        action: actions.current.onSaveAs,
+      },
+      {
+        id: 'cmd-preview',
+        title: 'Switch to Preview Mode',
+        subtitle: 'Render formatted markdown with syntax highlighting',
+        icon: <Eye className="w-4 h-4 text-sky-500" />,
+        action: () => actions.current.onChangeViewMode('preview'),
+      },
+      {
+        id: 'cmd-raw',
+        title: 'Switch to Raw Code Editor',
+        subtitle: 'Edit markdown source text in monospaced editor',
+        icon: <Code className="w-4 h-4 text-purple-500" />,
+        action: () => actions.current.onChangeViewMode('raw'),
+      },
+      {
+        id: 'cmd-split',
+        title: 'Switch to Split Dual View',
+        subtitle: 'Side-by-side live editor and rendered preview',
+        icon: <Columns2 className="w-4 h-4 text-indigo-500" />,
+        action: () => actions.current.onChangeViewMode('split'),
+      },
+      {
+        id: 'cmd-print',
+        title: 'Print / Save as PDF...',
+        subtitle: 'Print formatted document or export to PDF (Ctrl+P)',
+        icon: <Printer className="w-4 h-4 text-amber-500" />,
+        action: actions.current.onPrintPdf,
+      },
+      {
+        id: 'cmd-samples',
+        title: 'Browse Sample Markdown Library',
+        subtitle: 'Templates, syntax cheatsheets, and guides',
+        icon: <Sparkles className="w-4 h-4 text-amber-500" />,
+        action: actions.current.onOpenSampleLibrary,
+      },
+    ].filter((c) => c.title.toLowerCase().includes(q) || c.subtitle.toLowerCase().includes(q));
+
+    return [...matchedFiles, ...commands];
+    // Only the query and the library affect the result. The action callbacks are
+    // read through `actions` precisely so they stay out of this list.
+  }, [debouncedQuery, recentFiles]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {

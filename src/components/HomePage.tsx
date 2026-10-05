@@ -15,6 +15,7 @@ import {
 import { MarkdownFileRecord } from '../types';
 import { formatFileSize, formatTimestamp } from '../services/markdown';
 import { searchMarkdownFiles } from '../services/search';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { AppLogo } from './AppLogo';
 
 interface HomePageProps {
@@ -45,10 +46,20 @@ export const HomePage: React.FC<HomePageProps> = ({
   const isLight = theme === 'light';
 
   // Full-text search with context snippets
+  // Debounced. A full-text scan of the library costs ~11ms per keystroke on a
+  // 120-file / 2.2MB corpus, which is most of a frame budget spent before React
+  // has even rendered. The input stays instant; the results catch up.
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
+  // One definition of "the user is searching". These call sites previously mixed
+  // truthiness with trim(), so a single space - truthy but blank - blanked the
+  // results, the pinned section and the history table at once while the header
+  // still claimed to be searching for it.
+  const hasQuery = debouncedSearchQuery.trim().length > 0;
+
   const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    return searchMarkdownFiles(recentFiles, searchQuery);
-  }, [recentFiles, searchQuery]);
+    if (!hasQuery) return [];
+    return searchMarkdownFiles(recentFiles, debouncedSearchQuery);
+  }, [recentFiles, debouncedSearchQuery, hasQuery]);
 
   // Pinned items
   const pinnedFiles = useMemo(() => {
@@ -152,9 +163,10 @@ export const HomePage: React.FC<HomePageProps> = ({
               <Search className="w-4 h-4 text-sky-600 dark:text-sky-400" />
               <span>Full-Text Content Search</span>
             </label>
-            {searchQuery && (
+            {hasQuery && (
               <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                Found {searchResults.length} file{searchResults.length === 1 ? '' : 's'} matching "{searchQuery}"
+                Found {searchResults.length} file{searchResults.length === 1 ? '' : 's'} matching "
+                {debouncedSearchQuery.trim()}"
               </span>
             )}
           </div>
@@ -185,7 +197,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Search Results with Context Snippets */}
-          {searchQuery.trim() && (
+          {hasQuery && (
             <div className="space-y-4 pt-2 animate-in fade-in">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <FileText className="w-3.5 h-3.5 text-sky-500" />
@@ -296,7 +308,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         {/* Quick Access (Pinned Documents) */}
-        {!searchQuery && pinnedFiles.length > 0 && (
+        {!hasQuery && pinnedFiles.length > 0 && (
           <div className="space-y-3">
             <div className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wider ${
               isLight ? 'text-slate-700' : 'text-slate-300'
@@ -354,7 +366,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         )}
 
         {/* Recently Opened Files History Section */}
-        {!searchQuery && (
+        {!hasQuery && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
