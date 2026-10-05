@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0078D4"/>
+      <stop offset="50%" stop-color="#106EBE"/>
+      <stop offset="100%" stop-color="#004578"/>
+    </linearGradient>
+    <linearGradient id="accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00D2FF"/>
+      <stop offset="100%" stop-color="#0078D4"/>
+    </linearGradient>
+    <linearGradient id="paper-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E1DFDD"/>
+    </linearGradient>
+    <linearGradient id="fold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#005A9E"/>
+      <stop offset="100%" stop-color="#004578"/>
+    </linearGradient>
+    <filter id="fluent-shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#00182C" flood-opacity="0.35"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#00182C" flood-opacity="0.2"/>
+    </filter>
+    <filter id="inner-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Base App Canvas Backing -->
+  <rect width="512" height="512" rx="112" fill="url(#bg-grad)"/>
+
+  <!-- Subtle Mica / Acrylic highlight at top border -->
+  <rect x="2" y="2" width="508" height="508" rx="110" fill="none" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="3"/>
+
+  <!-- Document Sheet -->
+  <g filter="url(#fluent-shadow)">
+    <!-- Main Paper Body -->
+    <path d="M 120 96 L 312 96 L 392 176 L 392 416 C 392 429.255 381.255 440 368 440 L 144 440 C 130.745 440 120 429.255 120 416 Z" fill="url(#paper-grad)"/>
+    <!-- Fold Corner -->
+    <path d="M 312 96 L 312 168 C 312 172.418 315.582 176 320 176 L 392 176 Z" fill="url(#fold-grad)"/>
+  </g>
+
+  <!-- Markdown Symbol Accent Shield on Document -->
+  <rect x="156" y="210" width="200" height="130" rx="16" fill="#0078D4" filter="url(#inner-shadow)"/>
+  <rect x="156" y="210" width="200" height="130" rx="16" fill="none" stroke="#00D2FF" stroke-width="2.5" stroke-opacity="0.6"/>
+
+  <!-- The "M" for Markdown -->
+  <path d="M 184 308 L 184 242 L 206 274 L 228 242 L 228 308" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- The Markdown Down/Right Action Arrow -->
+  <path d="M 284 242 L 284 308 M 264 286 L 284 308 L 304 286" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Subtle Preview lines on document -->
+  <rect x="156" y="364" width="200" height="12" rx="6" fill="#A19F9D" fill-opacity="0.7"/>
+  <rect x="156" y="390" width="130" height="10" rx="5" fill="#C8C6C4" fill-opacity="0.7"/>
+
+  <!-- Windows App badge dot -->
+  <circle cx="340" cy="395" r="7" fill="#00D2FF"/>
+</svg>

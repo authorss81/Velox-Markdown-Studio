@@ -1,0 +1,52 @@
+name: Build Windows Executable (.exe)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Full Windows Executable & Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Package Windows Executable (.exe)
+        run: |
+          npx --yes electron-builder --win nsis portable \
+            --config.appId="com.veloxmd.studio" \
+            --config.productName="Velox Markdown Studio" \
+            --config.directories.output="release" \
+            --config.files="dist/**/*,electron/**/*" \
+            --config.main="electron/main.cjs" \
+            --config.win.target="nsis,portable"
+
+      - name: Upload Windows Executable Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeloxMD-Windows-Exe
+          path: |
+            release/*.exe
+            release/*.blockmap
+          if-no-files-found: error
+          retention-days: 30

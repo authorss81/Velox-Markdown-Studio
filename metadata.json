@@ -1,0 +1,6 @@
+{
+  "name": "Velox Markdown Studio",
+  "description": "Windows-native Markdown app to open, preview, edit, and save MD files with permanent memory, quick search, syntax highlighting, and downloadable installer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
