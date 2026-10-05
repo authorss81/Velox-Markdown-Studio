@@ -15,6 +15,7 @@ interface RawEditorProps {
   wordWrap?: boolean;
   theme?: 'dark' | 'light';
   targetLine?: number | null;
+  onTargetLineHandled?: () => void;
   onCursorChange?: (line: number, col: number) => void;
   onScrollPercentage?: (percentage: number) => void;
 }
@@ -22,15 +23,22 @@ interface RawEditorProps {
 export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
   content,
   onChange,
-  fontSize = 14,
+  fontSize = 16,
   wordWrap = true,
   theme = 'dark',
   targetLine,
+  onTargetLineHandled,
   onCursorChange,
   onScrollPercentage,
 }, ref) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
+  // Mirrors the latest content so callbacks that must not re-fire on every
+  // keystroke can read it without taking `content` as a dependency.
+  const contentRef = useRef(content);
+  contentRef.current = content;
+  const onCursorChangeRef = useRef(onCursorChange);
+  onCursorChangeRef.current = onCursorChange;
 
   // Search & Replace state
   const [showSearch, setShowSearch] = useState(false);
@@ -61,46 +69,64 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
 
   // Track cursor position
   const updateCursorPosition = () => {
-    if (!textareaRef.current || !onCursorChange) return;
-    const pos = textareaRef.current.selectionStart;
-    const textBefore = content.substring(0, pos);
+    const textarea = textareaRef.current;
+    const notify = onCursorChangeRef.current;
+    if (!textarea || !notify) return;
+    const pos = textarea.selectionStart;
+    const textBefore = contentRef.current.substring(0, pos);
     const line = textBefore.split('\n').length;
     const col = pos - textBefore.lastIndexOf('\n');
-    onCursorChange(line, col);
+    notify(line, col);
   };
 
-  // Jump to specific line
+  // Jump to specific line.
+  //
+  // Deliberately has NO dependency on `content`. It used to depend on it, which
+  // gave it a new identity on every keystroke; the targetLine effect below then
+  // re-fired ~100ms after every character typed, re-selecting the target line
+  // and stealing focus back into the textarea. One search-result click made the
+  // editor permanently overwrite that line with whatever was typed next.
   const scrollToLine = useCallback((lineNumber: number) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const linesArr = content.split('\n');
+    const linesArr = contentRef.current.split('\n');
+    const index = Math.min(Math.max(lineNumber - 1, 0), Math.max(linesArr.length - 1, 0));
     let charIndex = 0;
-    for (let i = 0; i < Math.min(lineNumber - 1, linesArr.length); i++) {
+    for (let i = 0; i < index; i++) {
       charIndex += linesArr[i].length + 1;
     }
 
-    const lineLength = linesArr[Math.min(lineNumber - 1, linesArr.length - 1)]?.length || 0;
+    const lineLength = linesArr[index]?.length || 0;
     textarea.focus();
     textarea.setSelectionRange(charIndex, charIndex + lineLength);
 
-    // Approximate line height ~24px
-    const lineHeight = 24;
-    textarea.scrollTop = Math.max(0, (lineNumber - 5) * lineHeight);
+    // Derive the scroll offset from the gutter rather than assuming a line
+    // height. With word wrap on (the default) N logical lines occupy far more
+    // than N * 24px, so the old estimate scrolled somewhere unrelated and the
+    // selection landed off-screen.
+    const gutterRow = lineNumbersRef.current?.children[index] as HTMLElement | undefined;
+    if (gutterRow) {
+      textarea.scrollTop = Math.max(0, gutterRow.offsetTop - textarea.clientHeight / 3);
+    } else {
+      textarea.scrollTop = Math.max(0, (lineNumber - 5) * 24);
+    }
     if (lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = textarea.scrollTop;
     }
     updateCursorPosition();
-  }, [content]);
+  }, []);
 
-  // Handle external targetLine jump
+  // Handle external targetLine jump. Consumes the request exactly once, so the
+  // parent must clear targetLine via onTargetLineHandled.
   useEffect(() => {
-    if (targetLine && targetLine > 0) {
-      setTimeout(() => {
-        scrollToLine(targetLine);
-      }, 100);
-    }
-  }, [targetLine, scrollToLine]);
+    if (!targetLine || targetLine <= 0) return;
+    const id = window.setTimeout(() => {
+      scrollToLine(targetLine);
+    }, 100);
+    onTargetLineHandled?.();
+    return () => window.clearTimeout(id);
+  }, [targetLine, scrollToLine, onTargetLineHandled]);
 
   // Handle keyboard shortcuts (Tab, Ctrl+F, Ctrl+H, Ctrl+B, Ctrl+I)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

@@ -7,23 +7,51 @@ const STORAGE_KEYS = {
   FILE_HISTORY: 'velox_file_history_v2',
   SETTINGS: 'velox_settings_v1',
   FILE_HANDLE_PREFIX: 'velox_handle_',
+  // Distinguishes "never initialised" from "the user cleared everything".
+  // Without this, an empty array was indistinguishable from a fresh install, so
+  // Clear History (and deleting the last sample) silently re-seeded the samples
+  // on the very next read.
+  INITIALIZED: 'velox_initialized_v1',
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   accentColor: 'blue',
-  fontSize: 14,
+  fontSize: 16,
   wordWrap: true,
   lineNumbers: true,
   syncScroll: true,
   defaultViewMode: 'preview',
-  autoSave: false,
+  autoSave: true,
 };
 
+/** Build the seed records for the bundled sample documents. */
+function buildSampleRecords(): MarkdownFileRecord[] {
+  const now = Date.now();
+  return SAMPLE_FILES.map((sample, idx) => ({
+    ...sample,
+    lastOpened: now - idx * 1800 * 1000,
+    lastModified: now - idx * 3600 * 1000,
+    hasFileSystemHandle: false,
+  }));
+}
+
 export async function getRecentFiles(): Promise<MarkdownFileRecord[]> {
+  let alreadyInitialised = false;
+
+  try {
+    const initialised = await get<boolean>(STORAGE_KEYS.INITIALIZED);
+    alreadyInitialised = initialised === true;
+  } catch {
+    // Fall through; the record read below is authoritative.
+  }
+
   try {
     const records = await get<MarkdownFileRecord[]>(STORAGE_KEYS.RECENT_FILES);
-    if (records && records.length > 0) {
+    // An empty array is a legitimate state (the user cleared their library) and
+    // must be honoured as-is. Previously `records.length > 0` meant "cleared"
+    // was indistinguishable from "fresh install" and the samples came back.
+    if (Array.isArray(records)) {
       return records;
     }
   } catch (err) {
@@ -31,40 +59,78 @@ export async function getRecentFiles(): Promise<MarkdownFileRecord[]> {
     const local = localStorage.getItem(STORAGE_KEYS.RECENT_FILES);
     if (local) {
       try {
-        return JSON.parse(local);
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error(e);
       }
     }
   }
 
-  // Initialize with initial samples
-  const now = Date.now();
-  const initialFiles: MarkdownFileRecord[] = SAMPLE_FILES.map((sample, idx) => ({
-    ...sample,
-    lastOpened: now - idx * 1800 * 1000,
-    lastModified: now - idx * 3600 * 1000,
-    hasFileSystemHandle: false,
-  }));
+  // Only seed a genuine first run. Once initialised, an absent record means the
+  // library was emptied and must stay empty.
+  if (alreadyInitialised) return [];
 
+  const initialFiles = buildSampleRecords();
   await saveAllRecentFiles(initialFiles);
+  try {
+    await set(STORAGE_KEYS.INITIALIZED, true);
+  } catch (err) {
+    console.warn('Could not persist initialisation flag', err);
+  }
   return initialFiles;
 }
 
 export async function saveAllRecentFiles(files: MarkdownFileRecord[]): Promise<void> {
+  const errors: unknown[] = [];
+
   try {
     await set(STORAGE_KEYS.RECENT_FILES, files);
   } catch (err) {
+    errors.push(err);
     console.warn('IndexedDB set failed, falling back to localStorage', err);
   }
+
   try {
-    localStorage.setItem(STORAGE_KEYS.RECENT_FILES, JSON.stringify(files));
+    // Mirror is metadata-only. Document bodies can be megabytes in aggregate and
+    // localStorage caps out around 5MB, so a QuotaExceededError here used to
+    // abort the whole write while the UI still reported a successful save.
+    localStorage.setItem(
+      STORAGE_KEYS.RECENT_FILES,
+      JSON.stringify(
+        files.map((f) => ({
+          id: f.id,
+          name: f.name,
+          path: f.path,
+          size: f.size,
+          lastOpened: f.lastOpened,
+          lastModified: f.lastModified,
+          wordCount: f.wordCount,
+          readingTimeMinutes: f.readingTimeMinutes,
+          isPinned: f.isPinned,
+          tags: f.tags,
+          hasFileSystemHandle: f.hasFileSystemHandle,
+        }))
+      )
+    );
   } catch (err) {
-    console.warn('localStorage set failed', err);
+    errors.push(err);
+    console.warn('localStorage mirror failed (non-fatal)', err);
+  }
+
+  // A first write must establish the sentinel even if the IDB write above threw.
+  try {
+    await set(STORAGE_KEYS.INITIALIZED, true);
+  } catch (err) {
+    errors.push(err);
   }
 
   // Sync to File History paths
   await syncFileHistory(files);
+
+  if (errors.length > 0) {
+    throw new Error(`Could not persist document library (${errors.length} backend error(s))`);
+  }
 }
 
 export async function getFileHistory(): Promise<FileHistoryItem[]> {
@@ -108,25 +174,38 @@ async function syncFileHistory(files: MarkdownFileRecord[]): Promise<void> {
   }
 }
 
-export async function saveFileRecord(
+export async function saveFileRecordImpl(
   file: MarkdownFileRecord,
   fileHandle?: FileSystemFileHandle
 ): Promise<void> {
-  const current = await getRecentFiles();
-  const existingIdx = current.findIndex(
-    (f) => f.id === file.id || (f.path && file.path && f.path === file.path)
-  );
-
   const updatedRecord: MarkdownFileRecord = {
     ...file,
     lastOpened: Date.now(),
     hasFileSystemHandle: !!fileHandle || file.hasFileSystemHandle,
   };
 
+  const current = await getRecentFiles();
+  // `id` is the only identity. Matching on `path` was actively harmful: the app
+  // fabricated every path as C:\Users\Windows\Documents\<name>, so opening
+  // `a\notes.md` and later `b\notes.md` collided and the second save silently
+  // overwrote the first document's content and metadata.
+  const existingIdx = current.findIndex((f) => f.id === file.id);
+
   let updatedList: MarkdownFileRecord[];
   if (existingIdx >= 0) {
     updatedList = [...current];
-    updatedList[existingIdx] = { ...updatedList[existingIdx], ...updatedRecord };
+    // A merge must never change identity, otherwise any tab holding the old id
+    // can never resolve its record again and silently becomes unopenable.
+    updatedList[existingIdx] = {
+      ...updatedList[existingIdx],
+      ...updatedRecord,
+      id: updatedList[existingIdx].id,
+      // Preserve user intent unless the caller explicitly changed it.
+      isPinned: updatedRecord.isPinned ?? updatedList[existingIdx].isPinned,
+      tags: updatedRecord.tags?.length
+        ? updatedRecord.tags
+        : (updatedList[existingIdx].tags ?? []),
+    };
   } else {
     updatedList = [updatedRecord, ...current];
   }
@@ -155,7 +234,7 @@ export async function getFileHandle(fileId: string): Promise<FileSystemFileHandl
   }
 }
 
-export async function deleteFileRecord(fileId: string): Promise<void> {
+export async function deleteFileRecordImpl(fileId: string): Promise<void> {
   const current = await getRecentFiles();
   const filtered = current.filter((f) => f.id !== fileId);
   await saveAllRecentFiles(filtered);
@@ -166,17 +245,40 @@ export async function deleteFileRecord(fileId: string): Promise<void> {
   }
 }
 
-export async function clearFileHistory(): Promise<void> {
-  await set(STORAGE_KEYS.RECENT_FILES, []);
-  await set(STORAGE_KEYS.FILE_HISTORY, []);
+export async function clearFileHistoryImpl(): Promise<void> {
+  const errors: unknown[] = [];
+
+  try {
+    await set(STORAGE_KEYS.RECENT_FILES, []);
+  } catch (e) {
+    errors.push(e);
+  }
+  try {
+    await set(STORAGE_KEYS.FILE_HISTORY, []);
+  } catch (e) {
+    errors.push(e);
+  }
   try {
     localStorage.removeItem(STORAGE_KEYS.RECENT_FILES);
   } catch (e) {
-    console.warn(e);
+    errors.push(e);
+  }
+  // Keep the sentinel set so the samples are not re-seeded on the next read.
+  try {
+    await set(STORAGE_KEYS.INITIALIZED, true);
+  } catch (e) {
+    errors.push(e);
+  }
+
+  if (errors.length > 0) {
+    // Previously these two `set` calls were unguarded, so an unavailable
+    // IndexedDB made Clear History a silent no-op: the promise rejected, the
+    // caller's UI update never ran, and the records stayed put.
+    throw new Error('Could not clear history: document storage is unavailable');
   }
 }
 
-export async function togglePin(fileId: string): Promise<boolean> {
+export async function togglePinImpl(fileId: string): Promise<boolean> {
   const current = await getRecentFiles();
   let newStatus = false;
   const updated = current.map((f) => {
@@ -188,6 +290,44 @@ export async function togglePin(fileId: string): Promise<boolean> {
   });
   await saveAllRecentFiles(updated);
   return newStatus;
+}
+
+/**
+ * Every library mutation is a read-modify-write over one shared record. Running
+ * two concurrently (drop three files onto the window while saving one) let both
+ * read the same snapshot, and the second write discarded the first one's
+ * insertion — files silently vanished from history despite a success toast.
+ * Chaining them makes each mutation observe the previous one's result.
+ */
+let writeChain: Promise<unknown> = Promise.resolve();
+
+function serialise<T>(fn: () => Promise<T>): Promise<T> {
+  const next = writeChain.then(fn, fn);
+  // Keep the chain alive even when a caller rejects.
+  writeChain = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
+export function saveFileRecord(
+  file: MarkdownFileRecord,
+  fileHandle?: FileSystemFileHandle
+): Promise<void> {
+  return serialise(() => saveFileRecordImpl(file, fileHandle));
+}
+
+export function deleteFileRecord(fileId: string): Promise<void> {
+  return serialise(() => deleteFileRecordImpl(fileId));
+}
+
+export function clearFileHistory(): Promise<void> {
+  return serialise(() => clearFileHistoryImpl());
+}
+
+export function togglePin(fileId: string): Promise<boolean> {
+  return serialise(() => togglePinImpl(fileId));
 }
 
 export function getAppSettings(): AppSettings {

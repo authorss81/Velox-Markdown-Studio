@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { TitleBar } from './components/TitleBar';
 import { TabBar } from './components/TabBar';
@@ -33,7 +33,7 @@ import {
 } from './services/markdown';
 import { downloadTextFile } from './services/export';
 import { SAMPLE_FILES } from './data/samples';
-import { FileTab, MarkdownFileRecord, ViewMode } from './types';
+import { FileTab, MarkdownFileRecord, ViewMode, AppSettings } from './types';
 import { UploadCloud } from 'lucide-react';
 
 export default function App() {
@@ -53,6 +53,10 @@ export default function App() {
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
   const [targetLine, setTargetLine] = useState<number | null>(null);
+  // RawEditor calls this once it has consumed a jump request. Without it
+  // targetLine stayed set forever, so the jump effect re-fired on every
+  // keystroke and re-selected (and then overwrote) the target line.
+  const clearTargetLine = useCallback(() => setTargetLine(null), []);
 
   // Editor and Preview refs for synchronized scrolling
   const editorRef = useRef<RawEditorHandle>(null);
@@ -75,6 +79,23 @@ export default function App() {
     setTimeout(() => {
       setToastMessage((prev) => (prev === msg ? null : prev));
     }, 2800);
+  }, []);
+
+  // Persist view preferences the user actually changes.
+  //
+  // saveAppSettings had exactly one caller (the theme toggle), so fontSize,
+  // wordWrap and syncScroll were read on mount but never written. Zoom,
+  // word-wrap and sync-scroll therefore reset to defaults on every launch even
+  // though the schema, the UI and the loading code all implied they persisted.
+  //
+  // Declared before every consumer: it is referenced in dependency arrays, so
+  // defining it later would be a temporal-dead-zone error at render time.
+  const persistViewPrefs = useCallback((patch: Partial<AppSettings>) => {
+    try {
+      saveAppSettings({ ...getAppSettings(), ...patch });
+    } catch (err) {
+      console.warn('Could not persist settings', err);
+    }
   }, []);
 
   // Synchronized scrolling handlers
@@ -120,24 +141,26 @@ export default function App() {
         : 'bg-slate-950 text-slate-100 select-none overflow-hidden antialiased';
   }, []);
 
-  // Toggle Light / Dark theme with full body class synchronisation
+  // Toggle Light / Dark theme with full body class synchronisation.
+  //
+  // The DOM mutation, localStorage write and toast used to live inside the
+  // setState updater. Updater functions must be pure: React may invoke them more
+  // than once per commit, which duplicates toasts and interleaves theme writes.
   const handleToggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      const root = document.documentElement;
-      root.classList.remove('dark', 'light');
-      root.classList.add(next);
-      document.body.className =
-        next === 'light'
-          ? 'bg-slate-50 text-slate-900 select-none overflow-hidden antialiased'
-          : 'bg-slate-950 text-slate-100 select-none overflow-hidden antialiased';
+    const next = theme === 'dark' ? 'light' : 'dark';
 
-      const settings = getAppSettings();
-      saveAppSettings({ ...settings, theme: next });
-      showToast(`Switched to ${next === 'light' ? 'Light' : 'Dark'} theme`);
-      return next;
-    });
-  }, [showToast]);
+    const root = document.documentElement;
+    root.classList.remove('dark', 'light');
+    root.classList.add(next);
+    document.body.className =
+      next === 'light'
+        ? 'bg-slate-50 text-slate-900 select-none overflow-hidden antialiased'
+        : 'bg-slate-950 text-slate-100 select-none overflow-hidden antialiased';
+
+    persistViewPrefs({ theme: next });
+    showToast(`Switched to ${next === 'light' ? 'Light' : 'Dark'} theme`);
+    setTheme(next);
+  }, [theme, persistViewPrefs, showToast]);
 
   // Load permanent memory recent files on mount
   useEffect(() => {
@@ -178,9 +201,6 @@ export default function App() {
           );
         }
         setTargetLine(lineToJump);
-        setTimeout(() => {
-          editorRef.current?.scrollToLine(lineToJump);
-        }, 120);
       }
       return;
     }
@@ -222,9 +242,6 @@ export default function App() {
 
     if (lineToJump && lineToJump > 0) {
       setTargetLine(lineToJump);
-      setTimeout(() => {
-        editorRef.current?.scrollToLine(lineToJump);
-      }, 150);
     }
 
     const updatedRecord: MarkdownFileRecord = {
@@ -396,6 +413,64 @@ export default function App() {
     );
   }, [activeTabId]);
 
+  // Debounced autosave.
+  //
+  // AppSettings.autoSave was declared and defaulted but read by nothing, so
+  // there was no crash recovery at all: a crash or accidental quit lost every
+  // keystroke since the last explicit save. This mirrors the in-progress buffer
+  // into the document library so reopening the tab restores the work. It is
+  // deliberately a *mirror* — the tab stays dirty, so the user is still told
+  // there are unsaved changes and the dirty-close guard still applies. Nothing
+  // is written to disk without an explicit Ctrl+S.
+  const autosaveEnabled = useMemo(() => getAppSettings().autoSave !== false, []);
+  const autosaveTimer = useRef<number | null>(null);
+  const latestTabsRef = useRef<FileTab[]>(tabs);
+  latestTabsRef.current = tabs;
+
+  useEffect(() => {
+    if (!autosaveEnabled) return;
+
+    const dirty = latestTabsRef.current.filter((t) => t.isDirty);
+    if (dirty.length === 0) return;
+
+    if (autosaveTimer.current !== null) {
+      window.clearTimeout(autosaveTimer.current);
+    }
+    autosaveTimer.current = window.setTimeout(() => {
+      void (async () => {
+        for (const tab of latestTabsRef.current.filter((t) => t.isDirty)) {
+          const wordCount = calculateWordCount(tab.content);
+          const record: MarkdownFileRecord = {
+            id: tab.fileId,
+            name: tab.name,
+            path: tab.path ?? '',
+            content: tab.content,
+            size: new Blob([tab.content]).size,
+            lastOpened: Date.now(),
+            lastModified: Date.now(),
+            wordCount,
+            readingTimeMinutes: calculateReadingTime(wordCount),
+            isPinned: recentFiles.find((r) => r.id === tab.fileId)?.isPinned ?? false,
+            tags: recentFiles.find((r) => r.id === tab.fileId)?.tags ?? ['Autosaved'],
+            hasFileSystemHandle: !!tab.fileHandle,
+          };
+          try {
+            await saveFileRecord(record, tab.fileHandle);
+          } catch (err) {
+            console.warn('Autosave failed', err);
+          }
+        }
+      })();
+    }, 1500);
+
+    return () => {
+      if (autosaveTimer.current !== null) {
+        window.clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = null;
+      }
+    };
+  }, [tabs, autosaveEnabled, recentFiles]);
+
   // Verify File System permissions before saving
   const verifyPermission = async (fileHandle: any, readWrite: boolean) => {
     const options = { mode: readWrite ? 'readwrite' : 'read' };
@@ -529,8 +604,11 @@ export default function App() {
             lastModified: Date.now(),
             wordCount,
             readingTimeMinutes: calculateReadingTime(wordCount),
-            isPinned: false,
-            tags: ['Windows File'],
+            // Preserve the user's own organisation across a Save As. These were
+            // hard-coded, so saving a pinned document to a new location silently
+            // unpinned it and replaced its tags with "Windows File".
+            isPinned: recentFiles.find((r) => r.id === activeTab.fileId)?.isPinned ?? false,
+            tags: recentFiles.find((r) => r.id === activeTab.fileId)?.tags ?? ['Windows File'],
             hasFileSystemHandle: true,
           };
 
@@ -589,10 +667,21 @@ export default function App() {
     );
   }, [activeTabId]);
 
-  // Close tab instantly without blocking dialogs
+  // Close a tab, refusing to silently discard unsaved work.
+  //
+  // This handler used to drop the tab unconditionally, so clicking the tab's ✕,
+  // middle-clicking it, or pressing Ctrl+W threw away every unsaved edit — and
+  // then showed a "Closed ..." toast, confirming the loss.
   const handleCloseTab = useCallback((fileId: string) => {
     const tabToClose = tabs.find((t) => t.fileId === fileId);
     if (!tabToClose) return;
+
+    if (tabToClose.isDirty) {
+      const discard = window.confirm(
+        `"${tabToClose.name}" has unsaved changes.\n\nClose it and discard your edits?`
+      );
+      if (!discard) return;
+    }
 
     const remaining = tabs.filter((t) => t.fileId !== fileId);
     setTabs(remaining);
@@ -604,8 +693,28 @@ export default function App() {
         setActiveTabId(null);
       }
     }
-    showToast(`Closed "${tabToClose.name}"`);
+    showToast(
+      tabToClose.isDirty
+        ? `Discarded unsaved changes in "${tabToClose.name}"`
+        : `Closed "${tabToClose.name}"`
+    );
   }, [tabs, activeTabId, showToast]);
+
+  // Warn before the window goes away with unsaved work in any tab. Without this,
+  // Alt+F4, the native title-bar X and the in-app close button all quit the app
+  // and discard every dirty tab with no prompt at all.
+  const hasDirtyTabs = tabs.some((t) => t.isDirty);
+
+  useEffect(() => {
+    if (!hasDirtyTabs) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Legacy signal still required by Chromium and Electron.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasDirtyTabs]);
 
   // Toggle pin in permanent memory
   const handleTogglePin = useCallback(async (fileId: string) => {
@@ -615,16 +724,36 @@ export default function App() {
 
   // Delete record from permanent memory
   const handleDeleteRecord = useCallback(async (fileId: string) => {
-    await deleteFileRecord(fileId);
-    setRecentFiles(await getRecentFiles());
-    showToast('Removed from permanent memory');
-  }, [showToast]);
+    const record = recentFiles.find((f) => f.id === fileId);
+    if (!record) return;
+    const confirmed = window.confirm(
+      `Remove "${record.name}" from your document library?\n\nThis does not delete the file on disk.`
+    );
+    if (!confirmed) return;
+    try {
+      await deleteFileRecord(fileId);
+      setRecentFiles(await getRecentFiles());
+      showToast('Removed from permanent memory');
+    } catch (err) {
+      console.error(err);
+      showToast('Could not remove: document storage unavailable');
+    }
+  }, [recentFiles, showToast]);
 
   // Clear all file history
   const handleClearHistory = useCallback(async () => {
-    await clearFileHistory();
-    setRecentFiles([]);
-    showToast('File history cleared');
+    const confirmed = window.confirm(
+      'Clear your entire document library?\n\nThis removes every remembered document from the app (files on disk are untouched) and cannot be undone.'
+    );
+    if (!confirmed) return;
+    try {
+      await clearFileHistory();
+      setRecentFiles([]);
+      showToast('File history cleared');
+    } catch (err) {
+      console.error(err);
+      showToast('Could not clear history: document storage unavailable');
+    }
   }, [showToast]);
 
   // Insert markdown tag helper
@@ -640,6 +769,20 @@ export default function App() {
   // Global Keyboard Shortcuts (Ctrl+S, Ctrl+Shift+S, Ctrl+O, Ctrl+N, Ctrl+K, Ctrl+W, F1)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Never act on a global shortcut while a dialog owns the keyboard.
+      // Without this guard, Ctrl+W behind the Shortcuts or Export modal closed
+      // the active document and discarded unsaved edits, and Ctrl+S saved the
+      // document while the user was typing in the palette's search box.
+      if (
+        showCommandPalette ||
+        showShortcuts ||
+        showExportModal ||
+        showSampleLibrary ||
+        lightboxImage
+      ) {
+        return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -669,7 +812,19 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, handleSaveAs, handleOpenLocalFile, handleNewFile, handleCloseTab, activeTabId]);
+  }, [
+    handleSave,
+    handleSaveAs,
+    handleOpenLocalFile,
+    handleNewFile,
+    handleCloseTab,
+    activeTabId,
+    showCommandPalette,
+    showShortcuts,
+    showExportModal,
+    showSampleLibrary,
+    lightboxImage,
+  ]);
 
   // Drag and Drop files onto window with visual overlay
   useEffect(() => {
@@ -808,11 +963,10 @@ export default function App() {
         wordWrap={wordWrap}
         syncScroll={syncScroll}
         onToggleSyncScroll={() => {
-          setSyncScroll((prev) => {
-            const next = !prev;
-            showToast(`Sync Scroll ${next ? 'Enabled' : 'Disabled'}`);
-            return next;
-          });
+          const next = !syncScroll;
+          setSyncScroll(next);
+          persistViewPrefs({ syncScroll: next });
+          showToast(`Sync Scroll ${next ? 'Enabled' : 'Disabled'}`);
         }}
         onChangeViewMode={handleChangeViewMode}
         onNewFile={handleNewFile}
@@ -822,20 +976,23 @@ export default function App() {
         onInsertMarkdown={handleInsertMarkdown}
         onOpenExportModal={() => setShowExportModal(true)}
         onOpenShortcuts={() => setShowShortcuts(true)}
-        onToggleWordWrap={() => setWordWrap(!wordWrap)}
+        onToggleWordWrap={() => {
+          const next = !wordWrap;
+          setWordWrap(next);
+          persistViewPrefs({ wordWrap: next });
+          showToast(`Word wrap ${next ? 'on' : 'off'}`);
+        }}
         onZoomIn={() => {
-          setFontSize((s) => {
-            const next = Math.min(s + 2, 32);
-            showToast(`Zoom: ${next}px`);
-            return next;
-          });
+          const next = Math.min(fontSize + 2, 32);
+          setFontSize(next);
+          persistViewPrefs({ fontSize: next });
+          showToast(`Zoom: ${next}px`);
         }}
         onZoomOut={() => {
-          setFontSize((s) => {
-            const next = Math.max(s - 2, 11);
-            showToast(`Zoom: ${next}px`);
-            return next;
-          });
+          const next = Math.max(fontSize - 2, 11);
+          setFontSize(next);
+          persistViewPrefs({ fontSize: next });
+          showToast(`Zoom: ${next}px`);
         }}
         isDirty={activeTab?.isDirty || false}
         hasHandle={!!activeTab?.fileHandle}
@@ -870,6 +1027,7 @@ export default function App() {
                   wordWrap={wordWrap}
                   theme={theme}
                   targetLine={targetLine}
+                  onTargetLineHandled={clearTargetLine}
                   onChange={handleContentChange}
                   onCursorChange={(line, col) => setCursorPos({ line, col })}
                 />
@@ -900,6 +1058,7 @@ export default function App() {
                     wordWrap={wordWrap}
                     theme={theme}
                     targetLine={targetLine}
+                    onTargetLineHandled={clearTargetLine}
                     onChange={handleContentChange}
                     onScrollPercentage={handleEditorScrollPercentage}
                     onCursorChange={(line, col) => setCursorPos({ line, col })}
@@ -979,10 +1138,33 @@ export default function App() {
       <SampleFilesModal
         isOpen={showSampleLibrary}
         onClose={() => setShowSampleLibrary(false)}
-        onSelectSample={(sampleId) => {
+        onSelectSample={async (sampleId) => {
           const sample = SAMPLE_FILES.find((s) => s.id === sampleId);
-          if (sample) {
-            handleOpenFileById(sample.id);
+          if (!sample) return;
+
+          // The sample list is static but opening delegated to the persisted
+          // record, so once a sample had been cleared from the library the click
+          // closed the modal and did nothing at all. Re-seed the record instead.
+          const existing = recentFiles.find((r) => r.id === sample.id);
+          if (existing) {
+            await handleOpenFileById(sample.id);
+            return;
+          }
+
+          const now = Date.now();
+          const record: MarkdownFileRecord = {
+            ...sample,
+            lastOpened: now,
+            lastModified: now,
+            hasFileSystemHandle: false,
+          };
+          try {
+            await saveFileRecord(record);
+            setRecentFiles(await getRecentFiles());
+            await handleOpenFileById(sample.id);
+          } catch (err) {
+            console.error(err);
+            showToast(`Could not open "${sample.name}": document storage unavailable`);
           }
         }}
       />
