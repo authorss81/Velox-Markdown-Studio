@@ -1,16 +1,6 @@
 import { Marked } from 'marked';
-import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
-
-/** Escape text for safe interpolation into an HTML attribute or element body. */
-function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { highlightCode, displayLanguage, grammarClass, escapeHtml, ensureLanguages } from './highlight';
 
 /**
  * Only allow image sources we are willing to load. Anything else (notably
@@ -18,9 +8,6 @@ function escapeHtml(value: unknown): string {
  * handed to the browser.
  */
 const SAFE_IMAGE_SRC = /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,|blob:|file:)/i;
-
-/** hljs language names are word-ish; anything else is not a language we trust. */
-const SAFE_LANG = /^[a-z0-9+#._-]{1,32}$/i;
 
 const markedInstance = new Marked({
   gfm: true,
@@ -62,27 +49,14 @@ markedInstance.use({
       `;
     },
     code({ text, lang }) {
-      // `lang` comes from the fence info string. Only accept it if it is a real
-      // hljs language AND matches a conservative charset, so it can never be
-      // used to break out of the class attribute below.
-      const requested = typeof lang === 'string' ? lang.trim().split(/\s+/)[0] : '';
-      const language = requested && SAFE_LANG.test(requested) && hljs.getLanguage(requested) ? requested : '';
-
-      let highlightedCode: string;
-      try {
-        if (language) {
-          highlightedCode = hljs.highlight(text, { language }).value;
-        } else {
-          // Deliberately not highlightAuto(): it runs every registered grammar
-          // (~190) against the snippet on every keystroke. Plain escaping is
-          // correct and O(n).
-          highlightedCode = escapeHtml(text);
-        }
-      } catch {
-        highlightedCode = escapeHtml(text);
-      }
-
-      const displayLang = escapeHtml(language || 'plaintext');
+      // `lang` comes from the fence info string. The highlighter module
+      // validates it against a conservative charset and a registered grammar, so
+      // it can never be used to break out of the class attribute below.
+      // Unlabelled blocks are escaped rather than run through highlightAuto,
+      // which used to execute every registered grammar on every keystroke.
+      const highlightedCode = highlightCode(text, lang);
+      const grammar = grammarClass(lang);
+      const displayLang = escapeHtml(displayLanguage(lang));
       const encodedCode = encodeURIComponent(text);
 
       return `
@@ -105,7 +79,7 @@ markedInstance.use({
               <span>Copy</span>
             </button>
           </div>
-          <pre class="p-4 overflow-x-auto font-mono text-sm leading-relaxed text-slate-200 m-0"><code class="hljs ${language}">${highlightedCode}</code></pre>
+          <pre class="p-4 overflow-x-auto font-mono text-sm leading-relaxed text-slate-200 m-0"><code class="hljs ${grammar}">${highlightedCode}</code></pre>
         </div>
       `;
     },
@@ -184,6 +158,10 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 
 export function parseMarkdown(markdown: string): string {
   try {
+    // Kick off (once) the on-demand grammar loads. Not awaited: the first render
+    // must not block on ~27 dynamic imports, and any fence whose grammar has not
+    // arrived yet simply renders as escaped plain text for a frame.
+    void ensureLanguages();
     const rendered = markedInstance.parse(markdown) as string;
     return DOMPurify.sanitize(rendered, PURIFY_CONFIG);
   } catch (err) {

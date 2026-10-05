@@ -1,4 +1,5 @@
 import { getBridge, type BridgeDocument } from '../types/ipc';
+import { downloadTextFile } from './export';
 
 /**
  * One file-open/save implementation for both environments.
@@ -175,7 +176,6 @@ function webAccess(): FsAccess {
 
       // No picker: hand the file to the browser's download flow. This cannot
       // update the original file, and callers must not claim that it did.
-      const { downloadTextFile } = await import('./export');
       const name = suggestedName.toLowerCase().endsWith('.md') ? suggestedName : `${suggestedName}.md`;
       downloadTextFile(name, content, 'text/markdown');
       return null;

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { parseMarkdown } from '../services/markdown';
+import { ensureLanguages } from '../services/highlight';
 
 export interface MarkdownPreviewHandle {
   scrollToPercentage: (percentage: number) => void;
@@ -23,7 +24,24 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
   onScrollPercentage,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const htmlContent = React.useMemo(() => parseMarkdown(content), [content]);
+
+  // highlight.js grammars are dynamically imported so they land in their own
+  // chunks instead of bloating the bundle. That makes them arrive a moment after
+  // the first render, so the initial parse necessarily produces plain text. The
+  // epoch re-runs the parse once they land; without it the preview would keep
+  // showing unhighlighted code until the user happened to edit the document.
+  const [grammarEpoch, setGrammarEpoch] = React.useState(0);
+  useEffect(() => {
+    let alive = true;
+    void ensureLanguages().then(() => {
+      if (alive) setGrammarEpoch((n) => n + 1);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const htmlContent = React.useMemo(() => parseMarkdown(content), [content, grammarEpoch]);
 
   // Expose imperative scrollToPercentage
   useImperativeHandle(ref, () => ({
