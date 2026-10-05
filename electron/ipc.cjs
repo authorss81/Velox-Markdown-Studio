@@ -110,6 +110,21 @@ function register() {
     focusedWindow()?.close();
   });
 
+  /**
+   * Repaint the native caption buttons when the app theme changes. Without this
+   * the symbols stay whatever colour they were created with, so a dark app ends
+   * up with invisible (or unreadable) window controls.
+   */
+  ipcMain.handle('window:set-titlebar-overlay', (_event, options) => {
+    const win = focusedWindow();
+    if (!win || typeof win.setTitleBarOverlay !== 'function') return false;
+    const color = typeof options?.color === 'string' ? options.color : '#0f172a';
+    const symbolColor = typeof options?.symbolColor === 'string' ? options.symbolColor : '#cbd5e1';
+    const height = Number.isFinite(options?.height) ? options.height : 42;
+    win.setTitleBarOverlay({ color, symbolColor, height });
+    return true;
+  });
+
   // ---- files --------------------------------------------------------------
   ipcMain.handle('fs:open', async () => {
     const result = await dialog.showOpenDialog(focusedWindow(), {

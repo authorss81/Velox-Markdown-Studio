@@ -93,7 +93,18 @@ function createWindow() {
     height: 840,
     minWidth: 800,
     minHeight: 600,
+    // Hide the native title bar but keep `frame: true`, so the window keeps its
+    // native resize borders, snap layouts, Aero Snap and accessibility. Windows
+    // then draws the real minimise/maximise/close buttons over our own header via
+    // titleBarOverlay. This is the supported way to get an app-styled title bar
+    // on Windows without hand-rolling window dragging.
     frame: true,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#0f172a',
+      symbolColor: '#cbd5e1',
+      height: 42,
+    },
     backgroundColor: '#0f172a',
     title: 'Velox Markdown Studio',
     icon: path.join(__dirname, '../public/favicon.ico'),

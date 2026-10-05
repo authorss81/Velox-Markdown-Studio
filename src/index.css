@@ -6,6 +6,22 @@
     --accent-blue: #0078d4;
     --accent-cyan: #00b7c3;
     --accent-purple: #8764b8;
+
+    /* The app header doubles as the window title bar (Electron
+       titleBarStyle:'hidden'). These two tokens keep its geometry honest. */
+    --velox-titlebar-height: 42px;
+    /* Width to keep clear on the right for the native caption buttons that
+       Windows draws over the header. Three Win11 buttons at ~46px each. */
+    --velox-caption-reserve: 140px;
+  }
+
+  /* When the Window Controls Overlay is active, Chromium exposes the real
+     title-bar geometry. Prefer it so the header stays aligned if the system
+     title-bar height differs (Windows 10 vs 11, DPI scaling). */
+  @supports (left: env(titlebar-area-x)) {
+    :root {
+      --velox-titlebar-height: env(titlebar-area-height, 42px);
+    }
   }
 }
 

@@ -170,6 +170,19 @@ export default function App() {
     setTheme(next);
   }, [theme, persistViewPrefs, showToast]);
 
+  // Keep the native caption buttons legible against the current theme. Windows
+  // draws them over our header, and their symbol colour is fixed when the window
+  // is created, so without this a light theme leaves dark-on-dark symbols.
+  useEffect(() => {
+    const bridge = getBridge();
+    if (!bridge) return;
+    void bridge.window.setTitleBarOverlay(
+      theme === 'light'
+        ? { color: '#ffffff', symbolColor: '#0f172a', height: 42 }
+        : { color: '#0f172a', symbolColor: '#cbd5e1', height: 42 }
+    );
+  }, [theme]);
+
   // Load permanent memory recent files on mount
   useEffect(() => {
     getRecentFiles().then((files) => {

@@ -17,6 +17,13 @@ const api = {
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
     close: () => ipcRenderer.invoke('window:close'),
+    /** Repaint the native caption buttons; called when the app theme changes. */
+    setTitleBarOverlay: (options) =>
+      ipcRenderer.invoke('window:set-titlebar-overlay', {
+        color: String(options?.color ?? '#0f172a'),
+        symbolColor: String(options?.symbolColor ?? '#cbd5e1'),
+        height: Number(options?.height ?? 42),
+      }),
     /** Returns an unsubscribe function. */
     onMaximizeChange: (callback) => {
       const listener = (_event, maximized) => callback(Boolean(maximized));

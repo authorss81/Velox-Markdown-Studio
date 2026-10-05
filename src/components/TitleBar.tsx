@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppLogo } from './AppLogo';
-import { Search, Minus, Square, Copy, X, Sun, Moon } from 'lucide-react';
+import { Search, Sun, Moon } from 'lucide-react';
 import { FileTab } from '../types';
 import { getBridge } from '../types/ipc';
 
@@ -19,72 +19,43 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onToggleTheme,
   onOpenSearch,
 }) => {
-  const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [isMaximized, setIsMaximized] = React.useState(false);
   const isLight = theme === 'light';
+  const isDesktop = getBridge() !== null;
 
-  // Desktop window control. These buttons previously called window.blur() for
-  // minimise (which only unfocuses the window) and the Fullscreen API for
-  // maximise (which is not the same as maximising a native window). With no
-  // preload there was no IPC route at all, so all three were decorative.
-  const bridge = getBridge();
-  const isDesktop = bridge !== null;
-
-  React.useEffect(() => {
-    if (!bridge) return;
-    let cancelled = false;
-    void bridge.window.isMaximized().then((v) => {
-      if (!cancelled) setIsMaximized(v);
-    });
-    // Keep the label honest when the user maximises by double-clicking the
-    // native title bar, snaps the window, or presses Win+Up.
-    const unsubscribe = bridge.window.onMaximizeChange((v) => setIsMaximized(v));
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [bridge]);
-
-  const handleMinimize = () => {
-    if (bridge) void bridge.window.minimize();
-  };
-
-  const handleToggleMaximize = () => {
-    if (bridge) {
-      void bridge.window.toggleMaximize().then(setIsMaximized);
-      return;
-    }
-    toggleFullscreen();
-  };
-
-  const handleCloseWindow = () => {
-    if (bridge) {
-      // Closes via IPC rather than destroy(), so the renderer's beforeunload
-      // guard still runs and unsaved work is not silently discarded.
-      void bridge.window.close();
-    }
-  };
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
-      setIsFullscreen(false);
-    }
-  };
+  // This header IS the window title bar.
+  //
+  // The app used to draw its own minimise/maximise/close buttons *and* let
+  // Windows draw a real native title bar directly above them - two stacked title
+  // bars. The fake ones did nothing: minimise called window.blur(), which only
+  // unfocuses the window, and maximise used the Fullscreen API instead of
+  // maximising. Close was inert whenever no tab was open, so the app looked
+  // unable to close itself.
+  //
+  // The window now uses titleBarStyle:'hidden' with titleBarOverlay, so Windows
+  // draws the genuine caption buttons on top of this header. Resize borders,
+  // snap layouts and keyboard accessibility all stay native because `frame`
+  // remains true - nothing here hand-rolls window dragging.
+  //
+  // Consequence: the header is a drag region, so every interactive element inside
+  // it must opt back out with -webkit-app-region: no-drag or it stops
+  // responding to clicks.
 
   return (
-    <header className={`h-[42px] select-none backdrop-blur-md border-b flex items-center justify-between px-3.5 z-50 text-xs sm:text-sm transition-colors duration-150 ${
-      isLight
-        ? 'bg-white/95 border-slate-200 text-slate-800 shadow-2xs'
-        : 'bg-slate-900/95 border-slate-800 text-slate-300'
-    }`}>
+    <header
+      style={{
+        // Reserve the right-hand strip for the real caption buttons that Windows
+        // draws over our content.
+        paddingRight: isDesktop ? 'var(--velox-caption-reserve, 140px)' : undefined,
+        height: 'var(--velox-titlebar-height, 42px)',
+      }}
+      className={`select-none backdrop-blur-md border-b flex items-center justify-between pl-3.5 pr-3 z-50 text-xs sm:text-sm transition-colors duration-150 [-webkit-app-region:drag] ${
+        isLight
+          ? 'bg-white/95 border-slate-200 text-slate-800 shadow-2xs'
+          : 'bg-slate-900/95 border-slate-800 text-slate-300'
+      }`}
+    >
       {/* Left: App Branding & File Title */}
-      <div className="flex items-center gap-3 overflow-hidden">
+      <div className="flex items-center gap-3 overflow-hidden [-webkit-app-region:no-drag]">
         <div className="flex items-center gap-2 font-semibold tracking-wide flex-shrink-0">
           <AppLogo size={22} className="w-5.5 h-5.5" />
           <span className={`text-sm font-bold hidden sm:inline ${isLight ? 'text-slate-900' : 'text-white'}`}>
@@ -115,7 +86,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       </div>
 
       {/* Middle: Windows Search / Command Palette Bar */}
-      <div className="flex-1 max-w-md mx-4 hidden md:block">
+      <div className="flex-1 max-w-md mx-4 hidden md:block [-webkit-app-region:no-drag]">
         <button
           onClick={onOpenSearch}
           className={`w-full h-7.5 px-3 rounded-lg border flex items-center justify-between transition-colors shadow-2xs text-xs sm:text-sm ${
@@ -138,8 +109,9 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         </button>
       </div>
 
-      {/* Right: Theme Toggle & Windows Caption Controls */}
-      <div className="flex items-center gap-2">
+      {/* Right: Theme Toggle. The window caption controls to its right are drawn
+          by Windows itself, over this header. */}
+      <div className="flex items-center gap-2 [-webkit-app-region:no-drag]">
         {/* Mobile Search button */}
         <button
           onClick={onOpenSearch}
@@ -162,54 +134,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           title={isLight ? 'Switch to Dark Theme' : 'Switch to Light Theme'}
         >
           {isLight ? (
-            <Sun className="w-4 h-4 text-amber-600 fill-amber-500" />
+            <Sun className="w-4 h-4 text-amber-600" />
           ) : (
-            <Moon className="w-4 h-4 text-sky-400 fill-sky-400" />
+            <Moon className="w-4 h-4 text-sky-400" />
           )}
           <span className="hidden sm:inline text-xs">{isLight ? 'Light' : 'Dark'}</span>
         </button>
 
-        {/* Windows 11 Standard Caption Buttons */}
-        <div className="flex items-center ml-1">
-          <button
-            onClick={handleMinimize}
-            className={`w-10 h-10 flex items-center justify-center transition ${
-              isLight ? 'text-slate-600 hover:bg-slate-200 hover:text-slate-900' : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-            }`}
-            title="Minimize"
-            aria-label="Minimize window"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleToggleMaximize}
-            className={`w-10 h-10 flex items-center justify-center transition ${
-              isLight ? 'text-slate-600 hover:bg-slate-200 hover:text-slate-900' : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-            }`}
-            title={isDesktop ? (isMaximized ? 'Restore' : 'Maximize') : isFullscreen ? 'Exit full screen' : 'Full screen'}
-            aria-label={isMaximized ? 'Restore window' : 'Maximize window'}
-          >
-            {isDesktop ? (
-              isMaximized ? (
-                <Copy className="w-3 h-3" />
-              ) : (
-                <Square className="w-3.5 h-3.5" />
-              )
-            ) : isFullscreen ? (
-              <Copy className="w-3 h-3" />
-            ) : (
-              <Square className="w-3.5 h-3.5" />
-            )}
-          </button>
-          <button
-            onClick={handleCloseWindow}
-            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-600 transition"
-            title="Close"
-            aria-label="Close window"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
       </div>
     </header>
   );
