@@ -39,12 +39,20 @@ jobs:
         run: |
           npx --yes electron-builder --win nsis portable --publish never
 
-      - name: Upload Windows Executable Artifacts
+      - name: Upload Windows Setup Installer (.exe)
         uses: actions/upload-artifact@v4
         with:
-          name: VeloxMD-Windows-Exe
+          name: 1-VeloxMD-Installer-Setup (Recommended)
+          path: release/*Setup*.exe
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Windows Portable Standalone (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: 2-VeloxMD-Portable-Standalone
           path: |
             release/*.exe
-            release/*.blockmap
-          if-no-files-found: error
+            !release/*Setup*.exe
+          if-no-files-found: warn
           retention-days: 30
