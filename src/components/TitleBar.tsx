@@ -1,7 +1,8 @@
 import React from 'react';
 import { AppLogo } from './AppLogo';
-import { Search, Minus, Square, X, Sun, Moon } from 'lucide-react';
+import { Search, Minus, Square, Copy, X, Sun, Moon } from 'lucide-react';
 import { FileTab } from '../types';
+import { getBridge } from '../types/ipc';
 
 interface TitleBarProps {
   activeTab: FileTab | null;
@@ -19,7 +20,50 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onOpenSearch,
 }) => {
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [isMaximized, setIsMaximized] = React.useState(false);
   const isLight = theme === 'light';
+
+  // Desktop window control. These buttons previously called window.blur() for
+  // minimise (which only unfocuses the window) and the Fullscreen API for
+  // maximise (which is not the same as maximising a native window). With no
+  // preload there was no IPC route at all, so all three were decorative.
+  const bridge = getBridge();
+  const isDesktop = bridge !== null;
+
+  React.useEffect(() => {
+    if (!bridge) return;
+    let cancelled = false;
+    void bridge.window.isMaximized().then((v) => {
+      if (!cancelled) setIsMaximized(v);
+    });
+    // Keep the label honest when the user maximises by double-clicking the
+    // native title bar, snaps the window, or presses Win+Up.
+    const unsubscribe = bridge.window.onMaximizeChange((v) => setIsMaximized(v));
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [bridge]);
+
+  const handleMinimize = () => {
+    if (bridge) void bridge.window.minimize();
+  };
+
+  const handleToggleMaximize = () => {
+    if (bridge) {
+      void bridge.window.toggleMaximize().then(setIsMaximized);
+      return;
+    }
+    toggleFullscreen();
+  };
+
+  const handleCloseWindow = () => {
+    if (bridge) {
+      // Closes via IPC rather than destroy(), so the renderer's beforeunload
+      // guard still runs and unsaved work is not silently discarded.
+      void bridge.window.close();
+    }
+  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -128,33 +172,40 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         {/* Windows 11 Standard Caption Buttons */}
         <div className="flex items-center ml-1">
           <button
-            onClick={() => {
-              window.blur();
-            }}
+            onClick={handleMinimize}
             className={`w-10 h-10 flex items-center justify-center transition ${
               isLight ? 'text-slate-600 hover:bg-slate-200 hover:text-slate-900' : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
             }`}
             title="Minimize"
+            aria-label="Minimize window"
           >
             <Minus className="w-4 h-4" />
           </button>
           <button
-            onClick={toggleFullscreen}
+            onClick={handleToggleMaximize}
             className={`w-10 h-10 flex items-center justify-center transition ${
               isLight ? 'text-slate-600 hover:bg-slate-200 hover:text-slate-900' : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
             }`}
-            title={isFullscreen ? 'Restore' : 'Maximize'}
+            title={isDesktop ? (isMaximized ? 'Restore' : 'Maximize') : isFullscreen ? 'Exit full screen' : 'Full screen'}
+            aria-label={isMaximized ? 'Restore window' : 'Maximize window'}
           >
-            <Square className="w-3.5 h-3.5" />
+            {isDesktop ? (
+              isMaximized ? (
+                <Copy className="w-3 h-3" />
+              ) : (
+                <Square className="w-3.5 h-3.5" />
+              )
+            ) : isFullscreen ? (
+              <Copy className="w-3 h-3" />
+            ) : (
+              <Square className="w-3.5 h-3.5" />
+            )}
           </button>
           <button
-            onClick={() => {
-              if (activeTab) {
-                window.close();
-              }
-            }}
+            onClick={handleCloseWindow}
             className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-600 transition"
             title="Close"
+            aria-label="Close window"
           >
             <X className="w-4 h-4" />
           </button>

@@ -31,10 +31,18 @@ import {
   calculateWordCount,
   calculateReadingTime,
 } from './services/markdown';
-import { downloadTextFile } from './services/export';
+import { getFsAccess, isDialogCancellation, type DocumentFile } from './services/fsAccess';
+import { getBridge, isElectronRuntime } from './types/ipc';
 import { SAMPLE_FILES } from './data/samples';
 import { FileTab, MarkdownFileRecord, ViewMode, AppSettings } from './types';
 import { UploadCloud } from 'lucide-react';
+
+/** Turn an unknown rejection into something worth showing a user. */
+function errorMessage(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'string' && err) return err;
+  return 'unknown error';
+}
 
 export default function App() {
   // Settings & Theme (Light / Dark)
@@ -206,13 +214,27 @@ export default function App() {
     }
 
     const record = recentFiles.find((f) => f.id === fileId);
-    if (!record) return;
+    if (!record) {
+      showToast('That document is no longer in your library');
+      return;
+    }
 
+    const fs = getFsAccess();
     const handle = await getFileHandle(fileId);
     let contentToLoad = record.content;
     let actualName = record.name;
 
-    if (handle) {
+    // Prefer the live file over the cached copy so external edits are picked up.
+    if (fs.kind === 'electron' && record.path) {
+      try {
+        contentToLoad = (await fs.readDocument(record.path)) ?? record.content;
+      } catch (err) {
+        // Deleted or moved on disk: fall back to the library copy rather than
+        // refusing to open, but say so.
+        console.warn('Could not re-read from disk, using the library copy', err);
+        showToast(`"${record.name}" could not be re-read from disk — showing the saved copy`);
+      }
+    } else if (handle) {
       try {
         const file = await handle.getFile();
         contentToLoad = await file.text();
@@ -253,135 +275,94 @@ export default function App() {
     setRecentFiles(await getRecentFiles());
   }, [tabs, recentFiles]);
 
-  // Open physical file from Windows via File System Access API
-  const handleOpenLocalFile = useCallback(async () => {
-    try {
-      if ('showOpenFilePicker' in window) {
-        const [handle] = await (window as any).showOpenFilePicker({
-          types: [
-            {
-              description: 'Markdown Files',
-              accept: {
-                'text/markdown': ['.md', '.markdown', '.mdown', '.mkd'],
-                'text/plain': ['.txt'],
-              },
-            },
-          ],
-          multiple: false,
-        });
+  // Register an opened document in the library and open a tab for it.
+  const adoptDocument = useCallback(
+    async (doc: DocumentFile, tag: string, toastPrefix: string) => {
+      // Reuse the record for a path we have seen before, so opening the same
+      // file twice focuses the existing tab instead of creating a duplicate that
+      // then fights over the same file.
+      const existing = doc.path ? recentFiles.find((r) => r.path === doc.path) : undefined;
+      const fileId = existing?.id ?? `file-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const wordCount = calculateWordCount(doc.content);
 
-        if (handle) {
-          const file = await handle.getFile();
-          const text = await file.text();
-          const fileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-          const wordCount = calculateWordCount(text);
-          const readTime = calculateReadingTime(wordCount);
-
-          const record: MarkdownFileRecord = {
-            id: fileId,
-            name: file.name,
-            path: `C:\\Users\\Windows\\Documents\\${file.name}`,
-            content: text,
-            size: file.size,
-            lastOpened: Date.now(),
-            lastModified: file.lastModified || Date.now(),
-            wordCount,
-            readingTimeMinutes: readTime,
-            isPinned: false,
-            tags: ['Windows File'],
-            hasFileSystemHandle: true,
-          };
-
-          await saveFileRecord(record, handle);
-          setRecentFiles(await getRecentFiles());
-
-          const newTab: FileTab = {
-            fileId,
-            name: file.name,
-            path: record.path,
-            content: text,
-            originalContent: text,
-            isDirty: false,
-            viewMode: 'preview',
-            cursorLine: 1,
-            cursorCol: 1,
-            fileHandle: handle,
-          };
-
-          setTabs((prev) => [...prev, newTab]);
-          setActiveTabId(fileId);
-          showToast(`Opened "${file.name}" from Windows disk`);
-          return;
-        }
-      }
-    } catch (err: any) {
-      if (err.name === 'AbortError') return;
-      console.warn('showOpenFilePicker error or unsupported, falling back to input', err);
-    }
-
-    // Fallback: file input element
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.md,.markdown,.mdown,.mkd,.txt';
-    input.onchange = async (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      const file = target.files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const text = (ev.target?.result as string) || '';
-        const fileId = `file-${Date.now()}`;
-        const wordCount = calculateWordCount(text);
-
-        const record: MarkdownFileRecord = {
-          id: fileId,
-          name: file.name,
-          path: `C:\\Users\\Windows\\Documents\\${file.name}`,
-          content: text,
-          size: file.size,
-          lastOpened: Date.now(),
-          lastModified: file.lastModified || Date.now(),
-          wordCount,
-          readingTimeMinutes: calculateReadingTime(wordCount),
-          isPinned: false,
-          tags: ['Imported'],
-        };
-
-        await saveFileRecord(record);
-        setRecentFiles(await getRecentFiles());
-
-        const newTab: FileTab = {
-          fileId,
-          name: file.name,
-          path: record.path,
-          content: text,
-          originalContent: text,
-          isDirty: false,
-          viewMode: 'preview',
-          cursorLine: 1,
-          cursorCol: 1,
-        };
-
-        setTabs((prev) => [...prev, newTab]);
-        setActiveTabId(fileId);
-        showToast(`Opened "${file.name}"`);
+      const record: MarkdownFileRecord = {
+        id: fileId,
+        name: doc.name,
+        // A real absolute path in Electron, empty in the browser. Never invented.
+        path: doc.path,
+        content: doc.content,
+        size: doc.size,
+        lastOpened: Date.now(),
+        lastModified: doc.lastModified || Date.now(),
+        wordCount,
+        readingTimeMinutes: calculateReadingTime(wordCount),
+        isPinned: existing?.isPinned ?? false,
+        tags: existing?.tags ?? [tag],
+        hasFileSystemHandle: !!doc.handle,
       };
-      reader.readAsText(file);
-    };
-    input.click();
-  }, [showToast]);
 
+      await saveFileRecord(record, doc.handle);
+      setRecentFiles(await getRecentFiles());
+
+      const alreadyOpen = tabs.find((t) => t.fileId === fileId);
+      if (alreadyOpen) {
+        setActiveTabId(fileId);
+        showToast(`"${doc.name}" is already open`);
+        return;
+      }
+
+      const newTab: FileTab = {
+        fileId,
+        name: doc.name,
+        path: doc.path || undefined,
+        content: doc.content,
+        originalContent: doc.content,
+        isDirty: false,
+        viewMode: 'preview',
+        cursorLine: 1,
+        cursorCol: 1,
+        fileHandle: doc.handle,
+      };
+
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(fileId);
+      showToast(`${toastPrefix} "${doc.name}"`);
+    },
+    [recentFiles, tabs, showToast]
+  );
+
+  // Open a file from disk.
+  //
+  // This used to be written entirely against the browser File System Access API.
+  // Electron loads the app from a file:// origin where that API does not exist,
+  // so the packaged app always fell through to a read-only <input type=file> and
+  // could never write back to the file the user opened. It now goes through the
+  // capability-detected adapter: native dialogs in Electron, the browser API in
+  // a browser tab.
+  const handleOpenLocalFile = useCallback(async () => {
+    const fs = getFsAccess();
+    try {
+      const doc = await fs.openDocument();
+      if (!doc) return; // user cancelled
+      await adoptDocument(doc, 'Windows File', 'Opened');
+    } catch (err) {
+      if (isDialogCancellation(err)) return;
+      console.error('Open failed', err);
+      showToast(`Could not open file: ${errorMessage(err)}`);
+    }
+  }, [adoptDocument, showToast]);
   // Create a new empty markdown document
   const handleNewFile = useCallback(() => {
     const fileId = `new-${Date.now()}`;
-    const name = `Untitled-${tabs.length + 1}.md`;
+    // Unique per document. Deriving this from the open-tab count reused the same
+    // name (and therefore the same record key) after closing a tab.
+    const name = `Untitled-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}.md`;
     const initialContent = `# ${name.replace('.md', '')}\n\nStart typing your Markdown here...\n`;
 
     const newTab: FileTab = {
       fileId,
       name,
-      path: `C:\\Users\\Windows\\Documents\\${name}`,
+      // No path until the document is actually saved somewhere.
       content: initialContent,
       originalContent: '',
       isDirty: true,
@@ -471,194 +452,184 @@ export default function App() {
     };
   }, [tabs, autosaveEnabled, recentFiles]);
 
-  // Verify File System permissions before saving
-  const verifyPermission = async (fileHandle: any, readWrite: boolean) => {
+  // Verify File System permissions before saving (browser path only)
+  const verifyPermission = async (fileHandle: FileSystemFileHandle, readWrite: boolean) => {
+    const handle = fileHandle as FileSystemFileHandle & {
+      queryPermission?: (o: { mode: string }) => Promise<PermissionState>;
+      requestPermission?: (o: { mode: string }) => Promise<PermissionState>;
+    };
     const options = { mode: readWrite ? 'readwrite' : 'read' };
     try {
-      if ((await fileHandle.queryPermission(options)) === 'granted') {
-        return true;
-      }
-      if ((await fileHandle.requestPermission(options)) === 'granted') {
-        return true;
-      }
+      if ((await handle.queryPermission?.(options)) === 'granted') return true;
+      if ((await handle.requestPermission?.(options)) === 'granted') return true;
     } catch {
-      // Permission API not supported or rejected
+      // Permission API unsupported or rejected; fall through.
     }
     return false;
   };
 
-  // Save changes directly back to disk or permanent memory
+  // Persist the active tab into the document library.
+  const persistToLibrary = useCallback(
+    async (tab: FileTab, tags: string[]) => {
+      const wordCount = calculateWordCount(tab.content);
+      const existing = recentFiles.find((r) => r.id === tab.fileId);
+      const record: MarkdownFileRecord = {
+        id: tab.fileId,
+        name: tab.name,
+        // Never fabricate a location. Empty means "this document has never been
+        // written to disk", which is true and can be displayed honestly.
+        path: tab.path ?? '',
+        content: tab.content,
+        size: new Blob([tab.content]).size,
+        lastOpened: Date.now(),
+        lastModified: Date.now(),
+        wordCount,
+        readingTimeMinutes: calculateReadingTime(wordCount),
+        isPinned: existing?.isPinned ?? false,
+        tags: existing?.tags ?? tags,
+        hasFileSystemHandle: !!tab.fileHandle,
+      };
+      await saveFileRecord(record, tab.fileHandle);
+      setRecentFiles(await getRecentFiles());
+    },
+    [recentFiles]
+  );
+
+  const markTabSaved = useCallback((fileId: string, content: string) => {
+    setTabs((prev) =>
+      prev.map((t) => (t.fileId === fileId ? { ...t, originalContent: content, isDirty: false } : t))
+    );
+  }, []);
+
+  // Save changes.
+  //
+  // Now genuinely writes back to the opened file: over IPC in Electron, through a
+  // FileSystemFileHandle in a supporting browser. It used to attempt the handle
+  // path, fail silently on the file:// origin, fall through to the library, and
+  // then clear the dirty flag and claim success — so a user could believe a file
+  // was saved when nothing had been written.
   const handleSave = useCallback(async () => {
     if (!activeTab) return;
+    const fs = getFsAccess();
 
-    if (activeTab.fileHandle) {
+    // Electron: write to the real path the user opened.
+    if (fs.kind === 'electron' && activeTab.path) {
       try {
-        const hasPerm = await verifyPermission(activeTab.fileHandle, true);
-        if (hasPerm) {
+        await fs.saveInPlace(activeTab.path, activeTab.content);
+        markTabSaved(activeTab.fileId, activeTab.content);
+        await persistToLibrary(activeTab, ['Windows File']);
+        confetti({ particleCount: 25, spread: 40, origin: { y: 0.9, x: 0.1 } });
+        showToast(`Saved to disk: ${activeTab.name}`);
+        return;
+      } catch (err) {
+        if (isDialogCancellation(err)) return;
+        console.error('Save to disk failed', err);
+        showToast(`Could not write to disk: ${errorMessage(err)}`);
+        // Deliberately do not clear the dirty flag: the file on disk is unchanged.
+        return;
+      }
+    }
+
+    // Browser with a handle.
+    if (activeTab.fileHandle && fs.canSaveInPlace) {
+      try {
+        if (await verifyPermission(activeTab.fileHandle, true)) {
           const writable = await activeTab.fileHandle.createWritable();
           await writable.write(activeTab.content);
           await writable.close();
-
-          setTabs((prev) =>
-            prev.map((t) =>
-              t.fileId === activeTab.fileId
-                ? { ...t, originalContent: activeTab.content, isDirty: false }
-                : t
-            )
-          );
-
-          const wordCount = calculateWordCount(activeTab.content);
-          const record: MarkdownFileRecord = {
-            id: activeTab.fileId,
-            name: activeTab.name,
-            path: activeTab.path || `C:\\Users\\Windows\\Documents\\${activeTab.name}`,
-            content: activeTab.content,
-            size: new Blob([activeTab.content]).size,
-            lastOpened: Date.now(),
-            lastModified: Date.now(),
-            wordCount,
-            readingTimeMinutes: calculateReadingTime(wordCount),
-            isPinned: recentFiles.find((f) => f.id === activeTab.fileId)?.isPinned || false,
-            tags: recentFiles.find((f) => f.id === activeTab.fileId)?.tags || ['Edited'],
-            hasFileSystemHandle: true,
-          };
-
-          await saveFileRecord(record, activeTab.fileHandle);
-          setRecentFiles(await getRecentFiles());
-
-          confetti({
-            particleCount: 25,
-            spread: 40,
-            origin: { y: 0.9, x: 0.1 },
-          });
-
-          showToast(`Saved changes directly to Windows disk: ${activeTab.name}`);
+          markTabSaved(activeTab.fileId, activeTab.content);
+          await persistToLibrary(activeTab, ['Windows File']);
+          confetti({ particleCount: 25, spread: 40, origin: { y: 0.9, x: 0.1 } });
+          showToast(`Saved: ${activeTab.name}`);
           return;
         }
-      } catch (err: any) {
-        console.error('Failed writing to fileHandle, falling back to Save As', err);
+        showToast('Permission denied — use "Save As" to choose a location');
+        return;
+      } catch (err) {
+        console.error('Save via handle failed', err);
+        showToast(`Could not save: ${errorMessage(err)}`);
+        return;
       }
     }
 
-    // Save in permanent memory
-    const wordCount = calculateWordCount(activeTab.content);
-    const record: MarkdownFileRecord = {
-      id: activeTab.fileId,
-      name: activeTab.name,
-      path: activeTab.path || `C:\\Users\\Windows\\Documents\\${activeTab.name}`,
-      content: activeTab.content,
-      size: new Blob([activeTab.content]).size,
-      lastOpened: Date.now(),
-      lastModified: Date.now(),
-      wordCount,
-      readingTimeMinutes: calculateReadingTime(wordCount),
-      isPinned: recentFiles.find((f) => f.id === activeTab.fileId)?.isPinned || false,
-      tags: recentFiles.find((f) => f.id === activeTab.fileId)?.tags || ['Draft'],
-    };
+    // No writable destination. Still keep the work in the library so it is not
+    // lost, but say plainly that the file on disk was not touched.
+    try {
+      await persistToLibrary({ ...activeTab, path: undefined }, ['Draft']);
+      markTabSaved(activeTab.fileId, activeTab.content);
+      showToast('Saved to your library only — use "Save As" to write to a file on disk');
+    } catch (err) {
+      console.error('Library save failed', err);
+      showToast(`Could not save: ${errorMessage(err)}`);
+    }
+  }, [activeTab, markTabSaved, persistToLibrary, showToast]);
 
-    await saveFileRecord(record);
-    setRecentFiles(await getRecentFiles());
-
-    setTabs((prev) =>
-      prev.map((t) =>
-        t.fileId === activeTab.fileId
-          ? { ...t, originalContent: activeTab.content, isDirty: false }
-          : t
-      )
-    );
-
-    showToast(`Saved to Permanent Memory. Use "Save As" to save to a specific Windows folder.`);
-  }, [activeTab, recentFiles, showToast]);
-
-  // Save As: save as another file in Windows
+  // Save As: choose a location on disk and write there.
   const handleSaveAs = useCallback(async () => {
     if (!activeTab) return;
+    const fs = getFsAccess();
+    const suggestedName = activeTab.name.toLowerCase().endsWith('.md')
+      ? activeTab.name
+      : `${activeTab.name}.md`;
 
     try {
-      if ('showSaveFilePicker' in window) {
-        const handle = await (window as any).showSaveFilePicker({
-          suggestedName: activeTab.name.endsWith('.md') ? activeTab.name : `${activeTab.name}.md`,
-          types: [
-            {
-              description: 'Markdown File',
-              accept: { 'text/markdown': ['.md'] },
-            },
-          ],
-        });
-
-        if (handle) {
-          const writable = await handle.createWritable();
-          await writable.write(activeTab.content);
-          await writable.close();
-
-          const file = await handle.getFile();
-          const wordCount = calculateWordCount(activeTab.content);
-
-          const record: MarkdownFileRecord = {
-            id: activeTab.fileId,
-            name: file.name,
-            path: `C:\\Users\\Windows\\Documents\\${file.name}`,
-            content: activeTab.content,
-            size: file.size,
-            lastOpened: Date.now(),
-            lastModified: Date.now(),
-            wordCount,
-            readingTimeMinutes: calculateReadingTime(wordCount),
-            // Preserve the user's own organisation across a Save As. These were
-            // hard-coded, so saving a pinned document to a new location silently
-            // unpinned it and replaced its tags with "Windows File".
-            isPinned: recentFiles.find((r) => r.id === activeTab.fileId)?.isPinned ?? false,
-            tags: recentFiles.find((r) => r.id === activeTab.fileId)?.tags ?? ['Windows File'],
-            hasFileSystemHandle: true,
-          };
-
-          await saveFileRecord(record, handle);
-          setRecentFiles(await getRecentFiles());
-
-          setTabs((prev) =>
-            prev.map((t) =>
-              t.fileId === activeTab.fileId
-                ? {
-                    ...t,
-                    name: file.name,
-                    path: record.path,
-                    originalContent: activeTab.content,
-                    isDirty: false,
-                    fileHandle: handle,
-                  }
-                : t
-            )
-          );
-
-          confetti({
-            particleCount: 40,
-            spread: 60,
-            origin: { y: 0.8 },
-          });
-
-          showToast(`File saved as "${file.name}" on Windows disk!`);
-          return;
+      const doc = await fs.saveDocumentAs(activeTab.content, suggestedName);
+      if (!doc) {
+        // Either the user cancelled, or the browser fell back to a download.
+        if (fs.kind === 'web') {
+          await persistToLibrary(activeTab, ['Exported']);
+          markTabSaved(activeTab.fileId, activeTab.content);
         }
+        return;
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') return;
-      console.warn('showSaveFilePicker failed or unsupported, using download fallback', err);
+
+      const existing = recentFiles.find((r) => r.id === activeTab.fileId);
+      const wordCount = calculateWordCount(activeTab.content);
+
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.fileId === activeTab.fileId
+            ? {
+                ...t,
+                name: doc.name,
+                path: doc.path || undefined,
+                fileHandle: doc.handle,
+                originalContent: activeTab.content,
+                isDirty: false,
+              }
+            : t
+        )
+      );
+
+      const record: MarkdownFileRecord = {
+        id: activeTab.fileId,
+        name: doc.name,
+        path: doc.path,
+        content: activeTab.content,
+        size: doc.size,
+        lastOpened: Date.now(),
+        lastModified: doc.lastModified || Date.now(),
+        wordCount,
+        readingTimeMinutes: calculateReadingTime(wordCount),
+        // Preserve the user's own organisation across a Save As. These were
+        // hard-coded, so saving a pinned document to a new location silently
+        // unpinned it and replaced its tags with "Windows File".
+        isPinned: existing?.isPinned ?? false,
+        tags: existing?.tags ?? ['Windows File'],
+        hasFileSystemHandle: !!doc.handle,
+      };
+
+      await saveFileRecord(record, doc.handle);
+      setRecentFiles(await getRecentFiles());
+
+      confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
+      showToast(fs.kind === 'electron' ? `Saved as "${doc.name}"` : `Exported "${doc.name}"`);
+    } catch (err) {
+      if (isDialogCancellation(err)) return;
+      console.error('Save As failed', err);
+      showToast(`Could not save: ${errorMessage(err)}`);
     }
-
-    // Fallback: download file
-    downloadTextFile(
-      activeTab.name.endsWith('.md') ? activeTab.name : `${activeTab.name}.md`,
-      activeTab.content,
-      'text/markdown'
-    );
-    setTabs((prev) =>
-      prev.map((t) =>
-        t.fileId === activeTab.fileId ? { ...t, originalContent: activeTab.content, isDirty: false } : t
-      )
-    );
-    showToast(`Downloaded "${activeTab.name}"`);
-  }, [activeTab, showToast]);
-
+  }, [activeTab, recentFiles, persistToLibrary, markTabSaved, showToast]);
   // Change active view mode
   const handleChangeViewMode = useCallback((mode: ViewMode) => {
     if (!activeTabId) return;
@@ -857,51 +828,37 @@ export default function App() {
       setIsDragging(false);
       dragCounter = 0;
 
+      const fs = getFsAccess();
       const items = e.dataTransfer?.items;
-      if (items && items.length > 0) {
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          if (item.kind === 'file') {
-            const file = item.getAsFile();
-            if (file && (file.name.endsWith('.md') || file.name.endsWith('.markdown') || file.name.endsWith('.txt'))) {
-              const text = await file.text();
-              const fileId = `drop-${Date.now()}-${i}`;
-              const wordCount = calculateWordCount(text);
+      if (!items || items.length === 0) return;
 
-              const record: MarkdownFileRecord = {
-                id: fileId,
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind !== 'file') continue;
+
+        const file = item.getAsFile();
+        if (!file) continue;
+        if (!/\.(md|markdown|mdown|mkd|txt)$/i.test(file.name)) continue;
+
+        try {
+          // Electron 32 removed File.path, so the real location comes from the
+          // preload bridge. Dropped files therefore get a genuine path and can be
+          // saved back, where before they were permanently read-only.
+          const droppedPath = isElectronRuntime() ? getBridge()?.pathForFile(file) ?? '' : '';
+          const doc = droppedPath
+            ? await fs.openDroppedPath(droppedPath)
+            : {
+                path: '',
                 name: file.name,
-                path: `C:\\Users\\Windows\\Documents\\${file.name}`,
-                content: text,
+                content: await file.text(),
                 size: file.size,
-                lastOpened: Date.now(),
                 lastModified: file.lastModified || Date.now(),
-                wordCount,
-                readingTimeMinutes: calculateReadingTime(wordCount),
-                isPinned: false,
-                tags: ['Dropped File'],
               };
-
-              await saveFileRecord(record);
-              setRecentFiles(await getRecentFiles());
-
-              const newTab: FileTab = {
-                fileId,
-                name: file.name,
-                path: record.path,
-                content: text,
-                originalContent: text,
-                isDirty: false,
-                viewMode: 'preview',
-                cursorLine: 1,
-                cursorCol: 1,
-              };
-
-              setTabs((prev) => [...prev, newTab]);
-              setActiveTabId(fileId);
-              showToast(`Opened dropped file: "${file.name}"`);
-            }
-          }
+          await adoptDocument(doc, 'Dropped File', 'Opened dropped file');
+        } catch (err) {
+          if (isDialogCancellation(err)) continue;
+          console.error('Drop failed', err);
+          showToast(`Could not open "${file.name}": ${errorMessage(err)}`);
         }
       }
     };

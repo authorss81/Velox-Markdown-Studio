@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, session, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { register: registerIpc } = require('./ipc.cjs');
 
 // Remove the default Windows top menu bar
 Menu.setApplicationMenu(null);
@@ -97,6 +98,7 @@ function createWindow() {
     title: 'Velox Markdown Studio',
     icon: path.join(__dirname, '../public/favicon.ico'),
     webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
@@ -106,6 +108,12 @@ function createWindow() {
 
   win.setMenuBarVisibility(false);
   lockNavigation(win);
+
+  // Keep the in-app maximise/restore button label honest. Previously the button
+  // tracked its own local state, so it desynced the moment the user maximised
+  // with the keyboard, double-clicked the title bar, or snapped the window.
+  win.on('maximize', () => win.webContents.send('window:maximize-changed', true));
+  win.on('unmaximize', () => win.webContents.send('window:maximize-changed', false));
 
   // Robust path resolution for packaged and dev environments
   const candidatePaths = [
@@ -126,6 +134,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   hardenSession(session.defaultSession);
+  registerIpc();
   createWindow();
 
   app.on('activate', () => {
