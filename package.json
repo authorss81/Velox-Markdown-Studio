@@ -1,7 +1,9 @@
 {
-  "name": "react-example",
+  "name": "velox-markdown-studio",
+  "version": "1.0.0",
+  "description": "Windows-native Markdown Studio to open, preview, edit, and save MD files",
+  "author": "Velox Studio",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
