@@ -43,13 +43,26 @@ export function downloadTextFile(filename: string, content: string, mimeType: st
   }
 }
 
+/** Escape text for interpolation into HTML text content or an attribute value. */
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function generateStandaloneHtml(filename: string, markdownContent: string, htmlBody: string): string {
-  const cleanTitle = filename.replace(/\.md$/i, '');
+  // The filename reaches this template from the document being previewed, so a
+  // name containing "</title><script>…" would otherwise break out of the title.
+  const cleanTitle = escapeHtml(filename.replace(/\.md$/i, ''));
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: blob: https:; style-src 'unsafe-inline'; font-src data:; script-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
   <title>${cleanTitle} - Velox Markdown</title>
   <style>
     body {
@@ -84,7 +97,7 @@ export function generateStandaloneHtml(filename: string, markdownContent: string
 }
 
 export function exportDocumentAsHtml(filename: string, markdownContent: string, htmlBody: string) {
-  const cleanTitle = filename.replace(/\.md$/i, '');
+  const cleanTitle = filename.replace(/\.md$/i, '').replace(/[\\/:*?"<>|]/g, '_');
   const htmlDoc = generateStandaloneHtml(filename, markdownContent, htmlBody);
   return downloadTextFile(`${cleanTitle}.html`, htmlDoc, 'text/html');
 }

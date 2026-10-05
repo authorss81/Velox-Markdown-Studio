@@ -1,5 +1,26 @@
 import { Marked } from 'marked';
 import hljs from 'highlight.js';
+import DOMPurify from 'dompurify';
+
+/** Escape text for safe interpolation into an HTML attribute or element body. */
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Only allow image sources we are willing to load. Anything else (notably
+ * `javascript:` and `vbscript:`) resolves to an empty src rather than being
+ * handed to the browser.
+ */
+const SAFE_IMAGE_SRC = /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,|blob:|file:)/i;
+
+/** hljs language names are word-ish; anything else is not a language we trust. */
+const SAFE_LANG = /^[a-z0-9+#._-]{1,32}$/i;
 
 const markedInstance = new Marked({
   gfm: true,
@@ -10,39 +31,58 @@ const markedInstance = new Marked({
 markedInstance.use({
   renderer: {
     image({ href, title, text }) {
-      const titleAttr = title ? `title="${title}"` : '';
-      const altAttr = text ? `alt="${text}"` : 'alt="Markdown Image"';
+      // `href`, `title` and `text` are attacker-controlled (they come from the
+      // document being previewed). They must be escaped before being spliced
+      // into attribute position, and href must be scheme-checked.
+      const safeHref = SAFE_IMAGE_SRC.test(href) ? escapeHtml(href) : '';
+      const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+      const altAttr = text ? `alt="${escapeHtml(text)}"` : 'alt="Markdown Image"';
+      const caption = text
+        ? `<figcaption class="text-xs text-slate-400 mt-2 italic text-center">${escapeHtml(text)}</figcaption>`
+        : '';
+
+      if (!safeHref) {
+        return `<div class="my-5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+          Blocked image reference &mdash; unsupported or unsafe URL scheme.
+        </div>`;
+      }
+
       return `
         <figure class="my-5 flex flex-col items-center">
           <div class="relative group max-w-full overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/50 shadow-lg cursor-zoom-in transition-all duration-200 hover:border-sky-500/50">
-            <img src="${href}" ${altAttr} ${titleAttr} class="max-w-full h-auto object-contain max-h-[500px] transition-transform duration-300 group-hover:scale-[1.01]" data-zoomable="true" loading="lazy" />
+            <img src="${safeHref}" ${altAttr}${titleAttr} class="max-w-full h-auto object-contain max-h-[500px] transition-transform duration-300 group-hover:scale-[1.01]" data-zoomable="true" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
             <div class="absolute inset-0 bg-sky-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
               <span class="bg-slate-950/80 text-sky-300 text-xs px-2.5 py-1 rounded-full border border-sky-500/30 flex items-center gap-1 shadow-md">
                 🔍 Click to zoom
               </span>
             </div>
           </div>
-          ${text ? `<figcaption class="text-xs text-slate-400 mt-2 italic text-center">${text}</figcaption>` : ''}
+          ${caption}
         </figure>
       `;
     },
     code({ text, lang }) {
-      const language = lang && hljs.getLanguage(lang) ? lang : '';
-      let highlightedCode = '';
+      // `lang` comes from the fence info string. Only accept it if it is a real
+      // hljs language AND matches a conservative charset, so it can never be
+      // used to break out of the class attribute below.
+      const requested = typeof lang === 'string' ? lang.trim().split(/\s+/)[0] : '';
+      const language = requested && SAFE_LANG.test(requested) && hljs.getLanguage(requested) ? requested : '';
+
+      let highlightedCode: string;
       try {
         if (language) {
           highlightedCode = hljs.highlight(text, { language }).value;
         } else {
-          highlightedCode = hljs.highlightAuto(text).value;
+          // Deliberately not highlightAuto(): it runs every registered grammar
+          // (~190) against the snippet on every keystroke. Plain escaping is
+          // correct and O(n).
+          highlightedCode = escapeHtml(text);
         }
       } catch {
-        highlightedCode = text
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
+        highlightedCode = escapeHtml(text);
       }
 
-      const displayLang = language || 'plaintext';
+      const displayLang = escapeHtml(language || 'plaintext');
       const encodedCode = encodeURIComponent(text);
 
       return `
@@ -69,28 +109,109 @@ markedInstance.use({
         </div>
       `;
     },
-    blockquote(token: any) {
-      const rawText = token.text || '';
-      // Parse inner content so bold (**text**), italics (*text*), and code render accurately
-      const parsedContent = markedInstance.parse(rawText);
-      return `<blockquote class="border-l-4 border-sky-600 bg-sky-950/20 px-4 py-2.5 my-3 rounded-r-lg text-slate-300 italic [&>p]:m-0">${parsedContent}</blockquote>`;
+    blockquote({ tokens }) {
+      // Parse the already-tokenised children. The previous implementation read
+      // `token.text`, which marked no longer provides, so every blockquote
+      // rendered empty; it also re-entered the parser on unbounded input.
+      let inner = '';
+      try {
+        inner = this.parser.parse(tokens ?? []);
+      } catch {
+        inner = '';
+      }
+      return `<blockquote class="border-l-4 border-sky-600 bg-sky-950/20 px-4 py-2.5 my-3 rounded-r-lg text-slate-300 italic [&>p]:m-0">${inner}</blockquote>`;
     },
   },
 });
 
+/**
+ * `marked` deliberately does not sanitize its output, and we inject that output
+ * with `dangerouslySetInnerHTML`. Every document therefore has to be treated as
+ * untrusted input: this is the boundary that stops a hostile .md file from
+ * executing script inside the app (and from riding along into exported HTML).
+ */
+const PURIFY_CONFIG = {
+  ALLOWED_TAGS: [
+    'p', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'strong', 'em', 'del', 's', 'code', 'pre', 'blockquote',
+    'ul', 'ol', 'li', 'a', 'img', 'figure', 'figcaption',
+    'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+    'span', 'div', 'button', 'input', 'sup', 'sub',
+    'svg', 'path', 'rect', 'circle', 'line', 'polyline', 'polygon', 'g',
+    'defs', 'linearGradient', 'radialGradient', 'stop',
+  ],
+  ALLOWED_ATTR: [
+    'href', 'src', 'alt', 'title', 'class', 'id', 'name', 'start', 'type',
+    'checked', 'disabled', 'width', 'height', 'align', 'colspan', 'rowspan',
+    'target', 'rel', 'loading', 'decoding', 'referrerpolicy',
+    'data-zoomable', 'data-code', 'data-task',
+    'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap',
+    'stroke-linejoin', 'd', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r',
+    'rx', 'ry', 'points', 'gradientUnits', 'gradientTransform', 'stop-color',
+    'stop-opacity', 'transform', 'aria-hidden', 'aria-label', 'role',
+  ],
+  // NOTE: deliberately no USE_PROFILES. Setting it makes DOMPurify discard the
+  // ALLOWED_TAGS/ALLOWED_ATTR above and substitute the profile defaults, which
+  // silently strips data-code/data-zoomable and breaks the copy button and the
+  // image lightbox. The explicit lists below are the source of truth.
+  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'form', 'base', 'meta', 'link', 'noscript', 'template', 'math', 'svgforeignobject'],
+  FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onmouseout', 'onfocus', 'onblur', 'onanimationstart', 'onanimationend', 'ontoggle', 'onchange', 'onsubmit', 'formaction', 'srcdoc', 'ping', 'http-equiv'],
+  ALLOW_DATA_ATTR: false,
+};
+
+// Task-list checkboxes are inert because marked emits `disabled=""`. We want
+// them clickable, so the hook below re-enables them. Every other attribute on an
+// <input> is stripped, so this cannot be used to smuggle event handlers.
+const ALLOWED_TASK_ATTR = ['type', 'checked', 'data-task'];
+
+/**
+ * Force safe link behaviour. marked already strips `javascript:` destinations,
+ * but a previewed link must never be able to navigate the app window itself
+ * (Electron) nor hand the opener to a new tab.
+ */
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A' && node.hasAttribute('href')) {
+    node.setAttribute('target', '_blank');
+    node.setAttribute('rel', 'noopener noreferrer nofollow');
+  }
+  if (node.tagName === 'INPUT' && node.getAttribute('type') === 'checkbox') {
+    for (const attr of Array.from(node.attributes)) {
+      if (!ALLOWED_TASK_ATTR.includes(attr.name)) node.removeAttribute(attr.name);
+    }
+    node.removeAttribute('disabled');
+  }
+});
+
 export function parseMarkdown(markdown: string): string {
   try {
-    return markedInstance.parse(markdown) as string;
+    const rendered = markedInstance.parse(markdown) as string;
+    return DOMPurify.sanitize(rendered, PURIFY_CONFIG);
   } catch (err) {
     console.error('Markdown parse error:', err);
-    return `<div class="text-rose-400 p-4">Error rendering markdown: ${String(err)}</div>`;
+    return '<div class="text-rose-400 p-4">Error rendering markdown.</div>';
   }
 }
 
 export function calculateWordCount(text: string): number {
   if (!text) return 0;
-  const words = text.trim().match(/\S+/g);
-  return words ? words.length : 0;
+  // O(1) space: the previous `text.match(/\S+/g)` allocated an array of every
+  // token in the document, which is ~100MB+ on a large file and ran on every
+  // keystroke via the status bar.
+  let count = 0;
+  let inWord = false;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    const isSpace = code === 32 || code === 9 || code === 10 || code === 13 || code === 12 || code === 11;
+    if (isSpace) {
+      if (inWord) {
+        count++;
+        inWord = false;
+      }
+    } else {
+      inWord = true;
+    }
+  }
+  return inWord ? count + 1 : count;
 }
 
 export function calculateReadingTime(wordCount: number): number {
