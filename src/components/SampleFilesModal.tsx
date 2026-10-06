@@ -61,7 +61,7 @@ export const SampleFilesModal: React.FC<SampleFilesModalProps> = ({
                 onSelectSample(sample.id);
                 onClose();
               }}
-              className="group p-4 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/60 hover:border-sky-500/40 cursor-pointer transition flex items-start justify-between gap-4"
+              className="group p-4 rounded-2xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/60 hover:border-sky-500/40 cursor-pointer transition flex items-start justify-between gap-4"
             >
               <div className="space-y-1.5 overflow-hidden">
                 <div className="flex items-center gap-2">

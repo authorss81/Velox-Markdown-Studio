@@ -53,12 +53,40 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
     return content.split('\n');
   }, [content]);
 
+  // Virtualized gutter. Every row is exactly 24px (h-6), so only the visible
+  // window plus overscan needs DOM nodes; spacers preserve the total height so
+  // scroll geometry is unaffected. Below the threshold the full list renders as
+  // before - virtualization only pays off on long documents.
+  const GUTTER_ROW_PX = 24;
+  const GUTTER_OVERSCAN = 150;
+  const GUTTER_WINDOW_THRESHOLD = 500;
+  const [gutterRange, setGutterRange] = useState<{ start: number; end: number } | null>(null);
+
+  const updateGutterRange = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta || lines.length <= GUTTER_WINDOW_THRESHOLD) {
+      setGutterRange((prev) => (prev === null ? prev : null));
+      return;
+    }
+    const start = Math.max(0, Math.floor(ta.scrollTop / GUTTER_ROW_PX) - GUTTER_OVERSCAN);
+    const end = Math.min(
+      lines.length,
+      Math.ceil((ta.scrollTop + ta.clientHeight) / GUTTER_ROW_PX) + GUTTER_OVERSCAN
+    );
+    setGutterRange((prev) => (prev && prev.start === start && prev.end === end ? prev : { start, end }));
+  }, [lines.length]);
+
+  useEffect(() => {
+    updateGutterRange();
+  }, [updateGutterRange]);
+
   // Sync scrolling between line numbers gutter and textarea
   const handleScroll = () => {
     if (textareaRef.current) {
       if (lineNumbersRef.current) {
         lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
       }
+      updateGutterRange();
       if (onScrollPercentage) {
         const maxScroll = textareaRef.current.scrollHeight - textareaRef.current.clientHeight;
         const pct = maxScroll > 0 ? textareaRef.current.scrollTop / maxScroll : 0;
@@ -104,13 +132,14 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
     // Derive the scroll offset from the gutter rather than assuming a line
     // height. With word wrap on (the default) N logical lines occupy far more
     // than N * 24px, so the old estimate scrolled somewhere unrelated and the
-    // selection landed off-screen.
-    const gutterRow = lineNumbersRef.current?.children[index] as HTMLElement | undefined;
-    if (gutterRow) {
-      textarea.scrollTop = Math.max(0, gutterRow.offsetTop - textarea.clientHeight / 3);
-    } else {
-      textarea.scrollTop = Math.max(0, (lineNumber - 5) * 24);
-    }
+    // selection landed off-screen. Every row carries data-line so the lookup
+    // survives gutter virtualization; spacers preserve total height, so the
+    // estimate fallback is exact for the same reason.
+    const gutterRow = lineNumbersRef.current?.querySelector(
+      `[data-line="${lineNumber}"]`
+    ) as HTMLElement | undefined;
+    const top = gutterRow ? gutterRow.offsetTop : (lineNumber - 1) * GUTTER_ROW_PX;
+    textarea.scrollTop = Math.max(0, top - textarea.clientHeight / 3);
     if (lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = textarea.scrollTop;
     }
@@ -413,11 +442,33 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
         }`}
         style={{ fontSize: `${fontSize}px` }}
       >
-          {lines.map((_, i) => (
-            <div key={i} className="h-6 velox-gutter-row">
-              {i + 1}
-            </div>
-          ))}
+          {gutterRange ? (
+            <>
+              {gutterRange.start > 0 && (
+                <div style={{ height: gutterRange.start * GUTTER_ROW_PX }} aria-hidden="true" />
+              )}
+              {lines.slice(gutterRange.start, gutterRange.end).map((_, k) => {
+                const i = gutterRange.start + k;
+                return (
+                  <div key={i} data-line={i + 1} className="h-6 velox-gutter-row">
+                    {i + 1}
+                  </div>
+                );
+              })}
+              {gutterRange.end < lines.length && (
+                <div
+                  style={{ height: (lines.length - gutterRange.end) * GUTTER_ROW_PX }}
+                  aria-hidden="true"
+                />
+              )}
+            </>
+          ) : (
+            lines.map((_, i) => (
+              <div key={i} data-line={i + 1} className="h-6 velox-gutter-row">
+                {i + 1}
+              </div>
+            ))
+          )}
       </div>
 
       {/* Monospaced Textarea Editor */}

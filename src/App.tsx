@@ -1375,6 +1375,7 @@ export default function App() {
           <div
             role="status"
             aria-live="polite"
+            aria-atomic="true"
             className={`absolute top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-medium shadow-2xl animate-in fade-in ${
               isLight
                 ? 'bg-white border-sky-300 text-slate-800 shadow-slate-300/50'
@@ -1388,7 +1389,7 @@ export default function App() {
 
         {/* Toast Notification */}
         {toasts.length > 0 && (
-          <div role="status" aria-live="polite" className="absolute bottom-4 right-4 z-50 flex flex-col items-stretch gap-2 max-w-sm">
+          <div role="status" aria-live="polite" aria-atomic="true" className="absolute bottom-4 right-4 z-50 flex flex-col items-stretch gap-2 max-w-sm">
             {toasts.map((toast) => (
               <div
                 key={toast.id}

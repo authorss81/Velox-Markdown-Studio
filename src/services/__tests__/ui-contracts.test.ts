@@ -225,10 +225,20 @@ describe('icon-button label contract', () => {
       'Unpin from Quick Access',
       'Close dialog',
       'New document',
+      'Formatting tools',
     ]) {
       const found = fs
         .readdirSync(dir)
-        .some((f) => f.endsWith('.tsx') && read(f).includes(`aria-label="${label}"`));
+        .some((f) => {
+          if (!f.endsWith('.tsx')) return false;
+          const src = read(f);
+          // Literal labels, or the toolbar's data-driven tool.label which carries
+          // the tooltip text for all twelve format buttons.
+          return (
+            src.includes(`aria-label="${label}"`) ||
+            (label === 'Formatting tools' && src.includes('aria-label={tool.label}'))
+          );
+        });
       expect(found, label).toBe(true);
     }
   });
@@ -244,6 +254,75 @@ describe('table overflow contract', () => {
     expect(table, 'standalone table rule with display:block').not.toBe('');
     expect(table).toContain('overflow-x: auto');
     expect(table).toContain('max-width: 100%');
+  });
+});
+
+describe('radius scale contract', () => {
+  it('snaps near-duplicate radii to the canonical steps', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'index.css'), 'utf8');
+    expect(css).toContain('--velox-radius-sm: 0.375rem;');
+    expect(css).toContain('--velox-radius-md: 0.5rem;');
+    expect(css).toContain('--velox-radius-lg: 0.75rem;');
+    // The old 5.6px and 9.6px values must not survive outside token definitions
+    // and comments. Proven sub-perceptual by scripts/capture.cjs (113 pixels of
+    // 1.2M, antialiased corners only).
+    const rules = css
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('/*') && !line.trim().startsWith('*') && !line.includes('--velox-'));
+    for (const line of rules) {
+      // Only radius declarations are in scope; 0.6rem margins and the like are
+      // spacing, not the radius scale.
+      if (!line.includes('border-radius')) continue;
+      expect(line, `stray radius: ${line.trim()}`).not.toMatch(/0\.35rem|(?<!\d)0\.6rem/);
+    }
+  });
+});
+
+describe('toolbar overflow contract', () => {
+  it('collapses the format group into a menu below 1280px', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'CommandBar.tsx'),
+      'utf8'
+    );
+    expect(src).toContain("useMediaQuery('(min-width: 1280px)')");
+    expect(src).toContain('aria-haspopup="menu"');
+    expect(src).toContain('role="menu"');
+    expect(src).toContain('role="menuitem"');
+    // One list rendered in two places, never duplicated markup.
+    expect(src).toContain('formatTools.map');
+    expect(src).not.toContain('hidden xl:flex');
+  });
+
+  it('drives labels from one breakpoint, not six prefixes', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'CommandBar.tsx'),
+      'utf8'
+    );
+    expect(src).toContain("useMediaQuery('(min-width: 1024px)')");
+    expect(src).not.toMatch(/hidden (sm|md|lg):inline/);
+  });
+});
+
+describe('gutter virtualization contract', () => {
+  it('windows long gutters with spacers that preserve geometry', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'RawEditor.tsx'),
+      'utf8'
+    );
+    expect(src).toContain('GUTTER_WINDOW_THRESHOLD');
+    expect(src).toContain('GUTTER_OVERSCAN');
+    expect(src).toContain('data-line={i + 1}');
+    expect(src).toContain('aria-hidden="true"');
+    // The jump lookup must survive windowing: no bare children[index].
+    expect(src).not.toContain('.children[index]');
   });
 });
 
@@ -266,9 +345,10 @@ describe('iconography and chrome contract', () => {
     expect(src).toContain('Share2');
     expect(src).toContain('SquareCode');
     // Code stays for the Raw view-mode segment; it must not double as the
-    // inline-code insert glyph anymore.
+    // inline-code insert glyph anymore. In the data-driven toolbar the icon
+    // precedes the run callback inside each entry.
     const inlineCodeBlock =
-      src.match(/onInsertMarkdown\('`', '`', 'code'\)[\s\S]*?<SquareCode/)?.[0] ?? '';
+      src.match(/key: 'code'[\s\S]*?SquareCode/)?.[0] ?? '';
     expect(inlineCodeBlock).not.toBe('');
   });
 

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <!--STYLES-->
+  <style>
+    body { margin: 0; background: #020617; }
+    #stage { width: 1280px; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div class="markdown-body" style="padding: 24px; max-width: 860px;">
+      <h1>Heading one</h1>
+      <p>Body copy with <strong>bold</strong>, <em>italic</em>, <del>struck</del>,
+      <code>inline()</code> and a <a href="https://example.com">link</a>.</p>
+      <h2>Heading two</h2>
+      <blockquote><p>Quoted text with <strong>emphasis</strong>.</p></blockquote>
+      <h3>Heading three</h3>
+      <ul>
+        <li>Plain item</li>
+        <li><input type="checkbox" data-task> Open task</li>
+        <li><input type="checkbox" data-task checked=""> Done task</li>
+      </ul>
+      <ol>
+        <li>First</li>
+        <li>Second</li>
+      </ol>
+      <h4>Heading four</h4>
+      <pre><code class="hljs javascript"><span>const a = 1;</span></code></pre>
+      <table>
+        <thead><tr><th>A</th><th>B</th></tr></thead>
+        <tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody>
+      </table>
+      <figure>
+        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="pixel" data-zoomable="true" loading="lazy">
+        <figcaption>Caption text</figcaption>
+      </figure>
+      <dl><dt>Term</dt><dd>Definition text.</dd></dl>
+      <p>Footnote ref<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">1</a></sup> here.</p>
+      <section class="footnotes" aria-label="Footnotes"><hr><ol><li id="fn-1">Note text. <a href="#fnref-1">back</a></li></ol></section>
+      <hr>
+      <div class="relative group my-4 rounded-xl overflow-hidden border border-slate-800 bg-[#0d1117] shadow-xl text-left">
+        <div class="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-b border-slate-800/80 select-none">
+          <span class="ml-2 text-xs font-mono font-medium text-slate-400 uppercase tracking-wider">javascript</span>
+          <button class="copy-code-btn text-xs text-slate-400 flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800" data-code="Y29uc3Q=">Copy</button>
+        </div>
+        <pre class="overflow-x-auto font-mono text-sm leading-relaxed text-slate-200"><code class="hljs javascript">code</code></pre>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

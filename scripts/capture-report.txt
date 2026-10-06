@@ -1,0 +1,1 @@
+capture current: sha256=bbd5f60995e6e93e51882dec8a5a72922fd4ebea664d8e9224a64e1f427559d8 DIFFERS: 113/1232400 pixels (0.0092%)

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   FilePlus,
   FolderOpen,
@@ -20,7 +20,7 @@ import {
   Table as TableIcon,
   Image as ImageIcon,
   Link as LinkIcon,
-
+  MoreHorizontal,
   WrapText,
   ZoomIn,
   ZoomOut,
@@ -29,6 +29,7 @@ import {
   Unlink2,
 } from 'lucide-react';
 import { ViewMode } from '../types';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 interface CommandBarProps {
   viewMode: ViewMode;
@@ -75,6 +76,71 @@ export const CommandBar: React.FC<CommandBarProps> = ({
 }) => {
   const isLight = theme === 'light';
 
+  // One source for the twelve formatting actions, rendered inline on wide
+  // windows and inside the overflow menu on narrow ones. Duplicating the
+  // buttons in two places would desync them; this way there is only one list.
+  const formatTools = [
+    { key: 'bold', label: 'Bold (Ctrl+B)', icon: <Bold className="w-4 h-4" />, run: () => onInsertMarkdown('**', '**', 'bold text'), extra: 'font-bold' },
+    { key: 'italic', label: 'Italic (Ctrl+I)', icon: <Italic className="w-4 h-4" />, run: () => onInsertMarkdown('*', '*', 'italic text'), extra: 'italic' },
+    { key: 'strike', label: 'Strikethrough', icon: <Strikethrough className="w-4 h-4" />, run: () => onInsertMarkdown('~~', '~~', 'strikethrough'), extra: '' },
+    { key: 'h1', label: 'Heading 1', icon: <Heading1 className="w-4 h-4" />, run: () => onInsertMarkdown('# ', '', 'Heading 1'), extra: '' },
+    { key: 'h2', label: 'Heading 2', icon: <Heading2 className="w-4 h-4" />, run: () => onInsertMarkdown('## ', '', 'Heading 2'), extra: '' },
+    { key: 'quote', label: 'Blockquote', icon: <Quote className="w-4 h-4" />, run: () => onInsertMarkdown('> ', '', 'Quote text'), extra: '' },
+    { key: 'code', label: 'Inline Code', icon: <SquareCode className="w-4 h-4" />, run: () => onInsertMarkdown('`', '`', 'code'), extra: '' },
+    { key: 'task', label: 'Task Checklist', icon: <CheckSquare className="w-4 h-4" />, run: () => onInsertMarkdown('- [ ] ', '', 'Task item'), extra: '' },
+    { key: 'bullet', label: 'Bulleted List', icon: <List className="w-4 h-4" />, run: () => onInsertMarkdown('- ', '', 'Bullet item'), extra: '' },
+    { key: 'table', label: 'Insert Table', icon: <TableIcon className="w-4 h-4" />, run: () => onInsertMarkdown('| Column 1 | Column 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n'), extra: '' },
+    { key: 'image', label: 'Insert Responsive Image', icon: <ImageIcon className="w-4 h-4" />, run: () => onInsertMarkdown('![Image description](', ')', 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800'), extra: '' },
+    { key: 'link', label: 'Insert Link', icon: <LinkIcon className="w-4 h-4" />, run: () => onInsertMarkdown('[', '](https://example.com)', 'Link title'), extra: '' },
+  ];
+
+  const formatButtonClass = (extra: string) =>
+    `h-7 w-7 inline-flex items-center justify-center rounded transition ${extra ? `${extra} ` : ''}${
+      isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'
+    }`;
+
+  // Wide enough for the inline format group (about 400px of buttons); below
+  // that they collapse into the overflow menu so Export is never scrolled away.
+  const showFormatInline = useMediaQuery('(min-width: 1280px)');
+  // One breakpoint for every toolbar label instead of six scattered prefixes
+  // that changed the toolbar at six different widths.
+  const showLabels = useMediaQuery('(min-width: 1024px)');
+
+  const [formatMenuOpen, setFormatMenuOpen] = useState(false);
+  const formatMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const formatMenuRef = useRef<HTMLDivElement>(null);
+  const [formatMenuPos, setFormatMenuPos] = useState({ top: 0, left: 0 });
+
+  const openFormatMenu = () => {
+    const rect = formatMenuButtonRef.current?.getBoundingClientRect();
+    if (rect) {
+      setFormatMenuPos({ top: rect.bottom + 6, left: Math.max(8, rect.right - 248) });
+    }
+    setFormatMenuOpen(true);
+  };
+
+  useEffect(() => {
+    if (!formatMenuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const el = e.target as HTMLElement;
+      if (!formatMenuRef.current?.contains(el) && !formatMenuButtonRef.current?.contains(el)) {
+        setFormatMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setFormatMenuOpen(false);
+        formatMenuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [formatMenuOpen]);
+
   return (
     <div className={`h-10 border-b px-4 flex items-center justify-between gap-2 overflow-x-auto text-xs no-scrollbar select-none transition-colors duration-150 ${
       isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-300'
@@ -89,7 +155,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           title="New Document (Ctrl+N)"
         >
           <FilePlus className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-          <span className="hidden sm:inline">New</span>
+          {showLabels && <span>New</span>}
         </button>
 
         <button
@@ -100,7 +166,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           title="Open MD File from Windows (Ctrl+O)"
         >
           <FolderOpen className="w-4 h-4 text-amber-500" />
-          <span className="hidden sm:inline">Open</span>
+          {showLabels && <span>Open</span>}
         </button>
 
         {!isHomeView && (
@@ -133,7 +199,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Save as another file in Windows (Ctrl+Shift+S)"
             >
               <FileDown className="w-4 h-4 text-emerald-500" />
-              <span className="hidden md:inline">Save As</span>
+              {showLabels && <span>Save As</span>}
             </button>
           </>
         )}
@@ -189,7 +255,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Split Mode: Side-by-side Raw Editor and Live Preview"
             >
               <Columns2 className="w-4 h-4" />
-              <span className="hidden lg:inline">Split</span>
+              {showLabels && <span>Split</span>}
             </button>
           </div>
 
@@ -216,105 +282,68 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           )}
 
           {/* Formatting tools for Raw / Edit mode */}
-          <div className="hidden xl:flex items-center gap-0.5">
-            <div className={`h-4 w-px mx-1 ${isLight ? 'bg-slate-300' : 'bg-slate-800'}`} />
-            <button
-              onClick={() => onInsertMarkdown('**', '**', 'bold text')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-800 font-bold' : 'hover:bg-slate-800 text-slate-200 font-bold'}`}
-              title="Bold (Ctrl+B)"
-              aria-label="Bold (Ctrl+B)"
-            >
-              <Bold className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('*', '*', 'italic text')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-800 italic' : 'hover:bg-slate-800 text-slate-200 italic'}`}
-              title="Italic (Ctrl+I)"
-              aria-label="Italic (Ctrl+I)"
-            >
-              <Italic className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('~~', '~~', 'strikethrough')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Strikethrough"
-              aria-label="Strikethrough"
-            >
-              <Strikethrough className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('# ', '', 'Heading 1')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Heading 1"
-              aria-label="Heading 1"
-            >
-              <Heading1 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('## ', '', 'Heading 2')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Heading 2"
-              aria-label="Heading 2"
-            >
-              <Heading2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('> ', '', 'Quote text')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Blockquote"
-              aria-label="Blockquote"
-            >
-              <Quote className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('`', '`', 'code')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Inline Code"
-              aria-label="Inline Code"
-            >
-              <SquareCode className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('- [ ] ', '', 'Task item')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Task Checklist"
-              aria-label="Task Checklist"
-            >
-              <CheckSquare className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('- ', '', 'Bullet item')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Bulleted List"
-              aria-label="Bulleted List"
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('| Column 1 | Column 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Insert Table"
-              aria-label="Insert Table"
-            >
-              <TableIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('![Image description](', ')', 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Insert Responsive Image"
-              aria-label="Insert Responsive Image"
-            >
-              <ImageIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onInsertMarkdown('[', '](https://example.com)', 'Link title')}
-              className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Insert Link"
-              aria-label="Insert Link"
-            >
-              <LinkIcon className="w-4 h-4" />
-            </button>
-          </div>
+          {showFormatInline ? (
+            <div className="flex items-center gap-0.5">
+              <div className={`h-4 w-px mx-1 ${isLight ? 'bg-slate-300' : 'bg-slate-800'}`} />
+              {formatTools.map((tool) => (
+                <button
+                  key={tool.key}
+                  onClick={tool.run}
+                  className={formatButtonClass(tool.extra)}
+                  title={tool.label}
+                  aria-label={tool.label}
+                >
+                  {tool.icon}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center">
+              <div className={`h-4 w-px mx-1 ${isLight ? 'bg-slate-300' : 'bg-slate-800'}`} />
+              <button
+                ref={formatMenuButtonRef}
+                onClick={() => (formatMenuOpen ? setFormatMenuOpen(false) : openFormatMenu())}
+                className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${
+                  isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'
+                }`}
+                title="Formatting tools"
+                aria-label="Formatting tools"
+                aria-haspopup="menu"
+                aria-expanded={formatMenuOpen}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+              {formatMenuOpen && (
+                <div
+                  ref={formatMenuRef}
+                  role="menu"
+                  aria-label="Formatting tools"
+                  style={{ top: formatMenuPos.top, left: formatMenuPos.left }}
+                  className={`fixed z-[70] w-60 rounded-xl border p-2 shadow-2xl animate-in fade-in ${
+                    isLight ? 'bg-white border-slate-300' : 'bg-slate-900 border-slate-700'
+                  }`}
+                >
+                  <div className="grid grid-cols-6 gap-1">
+                    {formatTools.map((tool) => (
+                      <button
+                        key={tool.key}
+                        role="menuitem"
+                        onClick={() => {
+                          tool.run();
+                          setFormatMenuOpen(false);
+                        }}
+                        className={formatButtonClass(tool.extra)}
+                        title={tool.label}
+                        aria-label={tool.label}
+                      >
+                        {tool.icon}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Right controls: Word Wrap, Font Zoom, Shortcuts Help, Export */}
           <div className="flex items-center gap-1.5">
@@ -364,7 +393,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Keyboard Shortcuts Reference (Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+K)"
             >
               <Keyboard className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-              <span className="hidden md:inline text-2xs">Shortcuts</span>
+              {showLabels && <span className="text-2xs">Shortcuts</span>}
             </button>
 
             {/* Export Button with original neutral styling and purple icon */}
@@ -377,7 +406,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Export Document (Download Markdown, HTML, PDF, or copy to clipboard)"
             >
               <Share2 className="w-4 h-4 text-purple-500" />
-              <span className="hidden sm:inline">Export</span>
+              {showLabels && <span>Export</span>}
             </button>
           </div>
         </>

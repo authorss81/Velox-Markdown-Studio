@@ -121,7 +121,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Quick Action Cards */}
         <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Option 1: Markdown */}
-          <div className={`p-4 rounded-xl border flex flex-col justify-between gap-3 ${
+          <div className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 ${
             isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
           }`}>
             <div>
@@ -151,7 +151,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           </div>
 
           {/* Option 2: Standalone HTML */}
-          <div className={`p-4 rounded-xl border flex flex-col justify-between gap-3 ${
+          <div className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 ${
             isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
           }`}>
             <div>
@@ -181,7 +181,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           </div>
 
           {/* Option 3: Print / PDF */}
-          <div className={`p-4 rounded-xl border flex flex-col justify-between gap-3 ${
+          <div className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 ${
             isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
           }`}>
             <div>
