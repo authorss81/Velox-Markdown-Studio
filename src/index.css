@@ -86,8 +86,10 @@
        titleBarStyle:'hidden'). These two tokens keep its geometry honest. */
     --velox-titlebar-height: 42px;
     /* Width to keep clear on the right for the native caption buttons that
-       Windows draws over the header. Three Win11 buttons at ~46px each. */
-    --velox-caption-reserve: 140px;
+       Windows draws over the header. Three Win11 buttons at ~46px each, plus a
+       few px of breathing room so DPI rounding can never push the theme toggle
+       underneath them. */
+    --velox-caption-reserve: 148px;
 
     /* Phase 5 rhythm tokens. These centralize the preview’s existing document
        spacing decisions without changing colors, fonts, radii, shadows, or
