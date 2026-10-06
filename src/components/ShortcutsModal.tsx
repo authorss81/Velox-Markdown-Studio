@@ -168,7 +168,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter shortcuts by key or action (e.g. Save, Ctrl+S, Bold)..."
-            className={`w-full bg-transparent text-xs outline-none ${
+            className={`w-full bg-transparent text-xs ${
               isLight ? 'text-slate-900 placeholder-slate-400' : 'text-slate-100 placeholder-slate-500'
             }`}
             autoFocus

@@ -79,7 +79,7 @@ markedInstance.use({
               <span>Copy</span>
             </button>
           </div>
-          <pre class="p-4 overflow-x-auto font-mono text-sm leading-relaxed text-slate-200 m-0"><code class="hljs ${grammar}">${highlightedCode}</code></pre>
+          <pre class="overflow-x-auto font-mono text-sm leading-relaxed text-slate-200 m-0"><code class="hljs ${grammar}">${highlightedCode}</code></pre>
         </div>
       `;
     },

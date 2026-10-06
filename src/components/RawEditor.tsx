@@ -275,7 +275,7 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Find in document..."
-              className={`rounded px-2.5 py-1 text-xs outline-none border focus:border-sky-500 w-48 ${
+              className={`rounded px-2.5 py-1 text-xs border focus:border-sky-500 w-48 ${
                 isLight ? 'bg-slate-100 border-slate-300 text-slate-900' : 'bg-slate-800 border-slate-700 text-slate-100'
               }`}
               autoFocus
@@ -322,7 +322,7 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
                 value={replaceQuery}
                 onChange={(e) => setReplaceQuery(e.target.value)}
                 placeholder="Replace with..."
-                className={`rounded px-2.5 py-1 text-xs outline-none border focus:border-sky-500 w-48 ${
+                className={`rounded px-2.5 py-1 text-xs border focus:border-sky-500 w-48 ${
                   isLight ? 'bg-slate-100 border-slate-300 text-slate-900' : 'bg-slate-800 border-slate-700 text-slate-100'
                 }`}
               />
@@ -373,7 +373,7 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
         onKeyDown={handleKeyDown}
         spellCheck={false}
         placeholder="Type Markdown content here..."
-        className={`flex-1 h-full py-4 px-4 bg-transparent outline-none resize-none leading-relaxed transition-colors ${
+        className={`flex-1 h-full py-4 px-4 bg-transparent resize-none leading-relaxed transition-colors ${
           isLight
             ? 'text-slate-900 selection:bg-sky-500/25 selection:text-slate-950 placeholder-slate-400'
             : 'text-slate-100 selection:bg-sky-500/40 selection:text-white placeholder-slate-600'

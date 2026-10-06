@@ -96,7 +96,7 @@ describe('preview color tokens', () => {
     '--velox-md-heading': '#0f172a',
     '--velox-md-h1-border': '#cbd5e1',
     '--velox-md-h2-border': '#e2e8f0',
-    '--velox-md-link': '#0284c7',
+    '--velox-md-link': '#0369a1',
     '--velox-md-link-hover': '#0369a1',
     '--velox-md-inline-code-bg': '#f1f5f9',
     '--velox-md-inline-code-text': '#0369a1',
@@ -154,5 +154,59 @@ describe('preview color tokens', () => {
     expect(css).toContain('border: var(--velox-md-image-border);');
     expect(css).toContain('box-shadow: var(--velox-md-image-shadow);');
     expect(css).toContain('box-shadow: var(--velox-md-image-hover-shadow);');
+  });
+});
+
+describe('app chrome CSS contract', () => {
+  it('makes dark: follow the app theme class instead of the OS', () => {
+    // Without this variant, Tailwind compiles dark: to prefers-color-scheme, so
+    // on a light-OS machine with the app theme dark, every dark: element
+    // rendered its light-mode colour.
+    expect(css).toMatch(/@custom-variant\s+dark\s*\(\s*&:where\(\.dark,\s*\.dark\s*\*\)\s*\)/);
+  });
+
+  it('provides one focus-visible ring for the whole app', () => {
+    expect(css).toMatch(/:where\(button,\s*a,\s*input,\s*textarea,\s*select,\s*\[tabindex\]\)\s*:focus-visible/);
+    expect(css).toMatch(/outline:\s*2px solid var\(--accent-blue\);/);
+    expect(css).toMatch(/outline-offset:\s*2px;/);
+  });
+
+  it('has no outline-none suppressions left in components', async () => {
+    // Every one of these defeated the global focus rule. Assert at the source
+    // level so a newly added input cannot silently reintroduce one.
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const dir = path.join(process.cwd(), 'src', 'components');
+    const offenders: string[] = [];
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.tsx')) continue;
+      const src = fs.readFileSync(path.join(dir, file), 'utf8');
+      if (/outline-none/.test(src)) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('implements the animation classes the components already use', () => {
+    for (const cls of ['.animate-in', '.fade-in', '.slide-in-from-bottom-2', '.zoom-in-95', '.no-scrollbar']) {
+      expect(css, `missing ${cls}`).toContain(cls);
+    }
+    expect(css).toMatch(/@keyframes velox-fade-in/);
+    expect(css).toMatch(/@keyframes velox-slide-in-from-bottom/);
+    expect(css).toMatch(/@keyframes velox-zoom-in/);
+    expect(css).toMatch(/\.no-scrollbar::-webkit-scrollbar/);
+  });
+
+  it('honours prefers-reduced-motion', () => {
+    expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+    expect(css).toMatch(/animation-duration:\s*0\.01ms/);
+    expect(css).toMatch(/transition-duration:\s*0\.01ms/);
+  });
+
+  it('defines themed scrollbar values instead of duplicating rules', () => {
+    expect(css).toContain('--velox-md-scrollbar-thumb: #64748b;');
+    expect(css).toContain('--velox-md-scrollbar-thumb-hover: #7c8aa3;');
+    expect(css).toContain('--velox-md-scrollbar-thumb: #94a3b8;');
+    expect(css).toContain('--velox-md-scrollbar-thumb-hover: #64748b;');
+    expect(css).toContain('::-webkit-scrollbar-corner');
   });
 });

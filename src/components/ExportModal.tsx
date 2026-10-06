@@ -241,7 +241,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <textarea
             readOnly
             value={activeTab === 'markdown' ? markdownContent : htmlContent}
-            className={`w-full h-44 p-3 rounded-xl border font-mono text-xs outline-none resize-none leading-relaxed select-text ${
+            className={`w-full h-44 p-3 rounded-xl border font-mono text-xs resize-none leading-relaxed select-text ${
               isLight
                 ? 'bg-slate-50 border-slate-300 text-slate-800'
                 : 'bg-slate-950 border-slate-800 text-slate-300'

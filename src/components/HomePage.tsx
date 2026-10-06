@@ -178,7 +178,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search across all indexed Markdown files (type keywords like 'consensus', 'guide', 'Windows', 'API', etc.)..."
-              className={`w-full border rounded-2xl pl-11 pr-24 py-3.5 text-sm outline-none transition shadow-inner ${
+              className={`w-full border rounded-2xl pl-11 pr-24 py-3.5 text-sm transition shadow-inner ${
                 isLight
                   ? 'bg-white border-slate-300 focus:border-sky-500 text-slate-900 placeholder-slate-400'
                   : 'bg-slate-900/90 border-slate-700/80 focus:border-sky-500 text-slate-100 placeholder-slate-500'

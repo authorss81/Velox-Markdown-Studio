@@ -231,7 +231,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             }}
             onKeyDown={handleKeyDown}
             placeholder="Type a command or search opened files..."
-            className={`flex-1 bg-transparent text-sm outline-none ${
+            className={`flex-1 bg-transparent text-sm ${
               isLight ? 'text-slate-900 placeholder-slate-400' : 'text-slate-100 placeholder-slate-500'
             }`}
             autoFocus

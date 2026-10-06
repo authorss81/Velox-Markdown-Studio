@@ -1,6 +1,25 @@
 @import "tailwindcss";
 @import "highlight.js/styles/github-dark.css";
 
+/* The app toggles a `dark`/`light` class on <html> itself. Without this,
+   Tailwind's `dark:` variant follows the OS colour scheme instead, so on a
+   Windows machine set to light with the app theme dark, every one of the
+   `dark:`-prefixed elements rendered its light-mode colour. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  /* One visible focus indicator for the whole app. Keyboard users tabbing through
+     the toolbar, tab strip or dialogs previously had no way to see where they
+     were: every button had zero focus styling. Mouse users never see this. */
+  :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+  }
+  :where(button, a, [role="tab"], [role="option"]):focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
 @layer base {
   :root {
     --accent-blue: #0078d4;
@@ -47,44 +66,29 @@
   }
 }
 
-/* Custom Windows 11 Fluent Scrollbars */
+/* Custom Windows 11 Fluent Scrollbars.
+   One rule set driven by theme variables; the track stays transparent so panes
+   stay flat and the thumb reads as a control rather than texture. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-
-html.dark ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.4);
+::-webkit-scrollbar-track {
+  background: var(--velox-md-scrollbar-track, transparent);
 }
-
-html.dark ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.4);
-  border-radius: 5px;
+::-webkit-scrollbar-thumb {
+  background: var(--velox-md-scrollbar-thumb, #64748b);
+  border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-
-html.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
+::-webkit-scrollbar-thumb:hover {
+  background: var(--velox-md-scrollbar-thumb-hover, #7c8aa3);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-
-html.light ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-html.light ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 5px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-html.light ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ========================================================
@@ -143,6 +147,9 @@ html.dark .markdown-body {
   --velox-md-row-alt-bg: rgba(15, 23, 42, 0.5);
   --velox-md-row-hover-bg: rgba(30, 41, 59, 0.6);
   --velox-md-hr-border: rgba(255, 255, 255, 0.15);
+  --velox-md-scrollbar-track: transparent;
+  --velox-md-scrollbar-thumb: #64748b;
+  --velox-md-scrollbar-thumb-hover: #7c8aa3;
   color: var(--velox-md-text);
 }
 
@@ -235,7 +242,7 @@ html.light .markdown-body {
   --velox-md-heading: #0f172a;
   --velox-md-h1-border: #cbd5e1;
   --velox-md-h2-border: #e2e8f0;
-  --velox-md-link: #0284c7;
+  --velox-md-link: #0369a1;
   --velox-md-link-hover: #0369a1;
   --velox-md-inline-code-bg: #f1f5f9;
   --velox-md-inline-code-text: #0369a1;
@@ -256,6 +263,9 @@ html.light .markdown-body {
   --velox-md-row-hover-bg: #f1f5f9;
   --velox-md-table-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   --velox-md-hr-border: #cbd5e1;
+  --velox-md-scrollbar-track: #f1f5f9;
+  --velox-md-scrollbar-thumb: #94a3b8;
+  --velox-md-scrollbar-thumb-hover: #64748b;
   color: var(--velox-md-text);
 }
 
@@ -489,4 +499,66 @@ html.light .markdown-body hr {
 .markdown-body hr {
   border: none;
   margin: 2.2rem 0;
+}
+
+/* ========================================================
+   Entrance transitions and scroll-hiding utilities.
+   Eleven class usages across the modals, lightbox, find bar and toast
+   referenced `tailwindcss-animate` plugin classes (`animate-in`, `fade-in`,
+   `slide-in-from-bottom-2`, `zoom-in-95`, `no-scrollbar`) that were never
+   installed, so all of them compiled to nothing and every overlay popped in
+   with zero transition. These make the existing classes do what they say.
+   ======================================================== */
+@keyframes velox-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes velox-slide-in-from-bottom {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes velox-zoom-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-in {
+  animation-duration: 150ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: velox-fade-in;
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: velox-slide-in-from-bottom;
+}
+
+.zoom-in-95 {
+  animation-name: velox-zoom-in;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Honour the OS reduced-motion setting everywhere: motion is decorative here,
+   never load-bearing. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
