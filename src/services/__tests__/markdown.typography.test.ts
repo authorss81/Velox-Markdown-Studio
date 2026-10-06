@@ -58,3 +58,101 @@ describe('preview rhythm contract', () => {
     expect(html).toContain('h1:first-child { margin-top: 0; }');
   });
 });
+
+describe('preview color tokens', () => {
+  const darkTokens: Record<string, string> = {
+    '--velox-md-text': '#e2e8f0',
+    '--velox-md-strong': '#ffffff',
+    '--velox-md-emphasis': '#f1f5f9',
+    '--velox-md-heading': '#f8fafc',
+    '--velox-md-h1-border': 'rgba(255, 255, 255, 0.12)',
+    '--velox-md-h2-border': 'rgba(255, 255, 255, 0.1)',
+    '--velox-md-link': '#38bdf8',
+    '--velox-md-link-hover': '#7dd3fc',
+    '--velox-md-inline-code-bg': 'rgba(51, 65, 85, 0.7)',
+    '--velox-md-inline-code-text': '#38bdf8',
+    '--velox-md-inline-code-border': 'rgba(255, 255, 255, 0.1)',
+    '--velox-md-pre-bg': '#090d16',
+    '--velox-md-pre-border': 'rgba(255, 255, 255, 0.12)',
+    '--velox-md-pre-shadow': '0 4px 20px rgba(0, 0, 0, 0.5)',
+    '--velox-md-quote-border': '#0078d4',
+    '--velox-md-quote-bg': 'rgba(0, 120, 212, 0.1)',
+    '--velox-md-quote-text': '#cbd5e1',
+    '--velox-md-table-border': 'rgba(255, 255, 255, 0.12)',
+    '--velox-md-th-bg': 'rgba(30, 41, 59, 0.9)',
+    '--velox-md-th-text': '#f8fafc',
+    '--velox-md-th-border': 'rgba(255, 255, 255, 0.15)',
+    '--velox-md-td-border': 'rgba(255, 255, 255, 0.08)',
+    '--velox-md-td-text': '#cbd5e1',
+    '--velox-md-row-alt-bg': 'rgba(15, 23, 42, 0.5)',
+    '--velox-md-row-hover-bg': 'rgba(30, 41, 59, 0.6)',
+    '--velox-md-hr-border': 'rgba(255, 255, 255, 0.15)',
+  };
+
+  const lightTokens: Record<string, string> = {
+    '--velox-md-text': '#1e293b',
+    '--velox-md-strong': '#020617',
+    '--velox-md-emphasis': '#0f172a',
+    '--velox-md-heading': '#0f172a',
+    '--velox-md-h1-border': '#cbd5e1',
+    '--velox-md-h2-border': '#e2e8f0',
+    '--velox-md-link': '#0284c7',
+    '--velox-md-link-hover': '#0369a1',
+    '--velox-md-inline-code-bg': '#f1f5f9',
+    '--velox-md-inline-code-text': '#0369a1',
+    '--velox-md-inline-code-border': '#cbd5e1',
+    '--velox-md-pre-bg': '#1e293b',
+    '--velox-md-pre-border': '#94a3b8',
+    '--velox-md-pre-shadow': '0 4px 16px rgba(0, 0, 0, 0.12)',
+    '--velox-md-quote-border': '#0284c7',
+    '--velox-md-quote-bg': '#f0f9ff',
+    '--velox-md-quote-text': '#334155',
+    '--velox-md-table-border': '#cbd5e1',
+    '--velox-md-th-bg': '#f8fafc',
+    '--velox-md-th-text': '#0f172a',
+    '--velox-md-th-border': '#cbd5e1',
+    '--velox-md-td-border': '#e2e8f0',
+    '--velox-md-td-text': '#334155',
+    '--velox-md-row-alt-bg': '#f8fafc',
+    '--velox-md-row-hover-bg': '#f1f5f9',
+    '--velox-md-table-shadow': '0 2px 8px rgba(0, 0, 0, 0.04)',
+    '--velox-md-hr-border': '#cbd5e1',
+  };
+
+  function themedColorDeclarations(theme: 'dark' | 'light'): string[] {
+    const startMarker =
+      theme === 'dark' ? '/* DARK THEME MARKDOWN */' : '/* LIGHT THEME MARKDOWN */';
+    const endMarker =
+      theme === 'dark' ? '/* LIGHT THEME MARKDOWN */' : '/* Headings sizing';
+    const section = css.slice(css.indexOf(startMarker), css.indexOf(endMarker));
+    const matches = section.match(
+      /(?:^|\n)\s*(?:color|background(?:-color)?|border(?:-[a-z-]+)?|box-shadow|accent-color)\s*:[^;]+;/g
+    );
+    return matches ?? [];
+  }
+
+  it.each([
+    ['dark', darkTokens],
+    ['light', lightTokens],
+  ] as const)('locks %s preview colors while routing them through tokens', (theme, tokens) => {
+    for (const [token, value] of Object.entries(tokens)) {
+      expect(css, `missing ${theme} ${token}`).toContain(`${token}: ${value};`);
+    }
+
+    for (const declaration of themedColorDeclarations(theme)) {
+      // Token definitions are checked above; every rendered color declaration
+      // must consume one.
+      if (declaration.includes('--velox-md-')) continue;
+      expect(declaration).toMatch(/var\(--velox-md-[a-z-]+\)/);
+    }
+  });
+
+  it('routes shared image and checkbox chrome through existing tokens', () => {
+    expect(css).toContain('accent-color: var(--accent-blue);');
+    expect(css).toContain('border-radius: var(--velox-md-image-radius);');
+    expect(css).toContain('margin: var(--velox-md-image-margin);');
+    expect(css).toContain('border: var(--velox-md-image-border);');
+    expect(css).toContain('box-shadow: var(--velox-md-image-shadow);');
+    expect(css).toContain('box-shadow: var(--velox-md-image-hover-shadow);');
+  });
+});

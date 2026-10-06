@@ -7,6 +7,14 @@
     --accent-cyan: #00b7c3;
     --accent-purple: #8764b8;
 
+    /* Shared preview chrome values. These are theme-independent and currently
+       identical everywhere they are used. */
+    --velox-md-image-radius: 0.6rem;
+    --velox-md-image-margin: 1.4rem auto;
+    --velox-md-image-border: 1px solid rgba(148, 163, 184, 0.25);
+    --velox-md-image-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+    --velox-md-image-hover-shadow: 0 10px 32px rgba(0, 120, 212, 0.3);
+
     /* The app header doubles as the window title bar (Electron
        titleBarStyle:'hidden'). These two tokens keep its geometry honest. */
     --velox-titlebar-height: 42px;
@@ -109,17 +117,43 @@ html.light ::-webkit-scrollbar-thumb:hover {
 
 /* DARK THEME MARKDOWN */
 html.dark .markdown-body {
-  color: #e2e8f0;
+  --velox-md-text: #e2e8f0;
+  --velox-md-strong: #ffffff;
+  --velox-md-emphasis: #f1f5f9;
+  --velox-md-heading: #f8fafc;
+  --velox-md-h1-border: rgba(255, 255, 255, 0.12);
+  --velox-md-h2-border: rgba(255, 255, 255, 0.1);
+  --velox-md-link: #38bdf8;
+  --velox-md-link-hover: #7dd3fc;
+  --velox-md-inline-code-bg: rgba(51, 65, 85, 0.7);
+  --velox-md-inline-code-text: #38bdf8;
+  --velox-md-inline-code-border: rgba(255, 255, 255, 0.1);
+  --velox-md-pre-bg: #090d16;
+  --velox-md-pre-border: rgba(255, 255, 255, 0.12);
+  --velox-md-pre-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --velox-md-quote-border: #0078d4;
+  --velox-md-quote-bg: rgba(0, 120, 212, 0.1);
+  --velox-md-quote-text: #cbd5e1;
+  --velox-md-table-border: rgba(255, 255, 255, 0.12);
+  --velox-md-th-bg: rgba(30, 41, 59, 0.9);
+  --velox-md-th-text: #f8fafc;
+  --velox-md-th-border: rgba(255, 255, 255, 0.15);
+  --velox-md-td-border: rgba(255, 255, 255, 0.08);
+  --velox-md-td-text: #cbd5e1;
+  --velox-md-row-alt-bg: rgba(15, 23, 42, 0.5);
+  --velox-md-row-hover-bg: rgba(30, 41, 59, 0.6);
+  --velox-md-hr-border: rgba(255, 255, 255, 0.15);
+  color: var(--velox-md-text);
 }
 
 html.dark .markdown-body strong,
 html.dark .markdown-body b {
-  color: #ffffff !important;
+  color: var(--velox-md-strong) !important;
 }
 
 html.dark .markdown-body em,
 html.dark .markdown-body i {
-  color: #f1f5f9;
+  color: var(--velox-md-emphasis);
 }
 
 html.dark .markdown-body h1,
@@ -128,84 +162,111 @@ html.dark .markdown-body h3,
 html.dark .markdown-body h4,
 html.dark .markdown-body h5,
 html.dark .markdown-body h6 {
-  color: #f8fafc;
+  color: var(--velox-md-heading);
 }
 
 html.dark .markdown-body h1 {
-  border-bottom: 2px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 2px solid var(--velox-md-h1-border);
 }
 
 html.dark .markdown-body h2 {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--velox-md-h2-border);
 }
 
 html.dark .markdown-body a {
-  color: #38bdf8;
+  color: var(--velox-md-link);
 }
 
 html.dark .markdown-body a:hover {
-  color: #7dd3fc;
+  color: var(--velox-md-link-hover);
 }
 
 html.dark .markdown-body code:not(pre code) {
-  background: rgba(51, 65, 85, 0.7);
-  color: #38bdf8;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--velox-md-inline-code-bg);
+  color: var(--velox-md-inline-code-text);
+  border: 1px solid var(--velox-md-inline-code-border);
   font-weight: 600;
 }
 
 html.dark .markdown-body pre {
-  background: #090d16 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  background: var(--velox-md-pre-bg) !important;
+  border: 1px solid var(--velox-md-pre-border);
+  box-shadow: var(--velox-md-pre-shadow);
 }
 
 html.dark .markdown-body blockquote {
-  border-left: 4px solid #0078d4;
-  background: rgba(0, 120, 212, 0.1);
-  color: #cbd5e1;
+  border-left: 4px solid var(--velox-md-quote-border);
+  background: var(--velox-md-quote-bg);
+  color: var(--velox-md-quote-text);
 }
 
 html.dark .markdown-body table {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--velox-md-table-border);
 }
 
 html.dark .markdown-body th {
-  background: rgba(30, 41, 59, 0.9);
-  color: #f8fafc;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  background: var(--velox-md-th-bg);
+  color: var(--velox-md-th-text);
+  border-bottom: 2px solid var(--velox-md-th-border);
 }
 
 html.dark .markdown-body td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: #cbd5e1;
+  border-bottom: 1px solid var(--velox-md-td-border);
+  color: var(--velox-md-td-text);
 }
 
 html.dark .markdown-body tr:nth-child(even) {
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--velox-md-row-alt-bg);
 }
 
 html.dark .markdown-body tr:hover {
-  background: rgba(30, 41, 59, 0.6);
+  background: var(--velox-md-row-hover-bg);
 }
 
 html.dark .markdown-body hr {
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid var(--velox-md-hr-border);
 }
 
 /* LIGHT THEME MARKDOWN */
 html.light .markdown-body {
-  color: #1e293b;
+  --velox-md-text: #1e293b;
+  --velox-md-strong: #020617;
+  --velox-md-emphasis: #0f172a;
+  --velox-md-heading: #0f172a;
+  --velox-md-h1-border: #cbd5e1;
+  --velox-md-h2-border: #e2e8f0;
+  --velox-md-link: #0284c7;
+  --velox-md-link-hover: #0369a1;
+  --velox-md-inline-code-bg: #f1f5f9;
+  --velox-md-inline-code-text: #0369a1;
+  --velox-md-inline-code-border: #cbd5e1;
+  --velox-md-pre-bg: #1e293b;
+  --velox-md-pre-border: #94a3b8;
+  --velox-md-pre-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --velox-md-quote-border: #0284c7;
+  --velox-md-quote-bg: #f0f9ff;
+  --velox-md-quote-text: #334155;
+  --velox-md-table-border: #cbd5e1;
+  --velox-md-th-bg: #f8fafc;
+  --velox-md-th-text: #0f172a;
+  --velox-md-th-border: #cbd5e1;
+  --velox-md-td-border: #e2e8f0;
+  --velox-md-td-text: #334155;
+  --velox-md-row-alt-bg: #f8fafc;
+  --velox-md-row-hover-bg: #f1f5f9;
+  --velox-md-table-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --velox-md-hr-border: #cbd5e1;
+  color: var(--velox-md-text);
 }
 
 html.light .markdown-body strong,
 html.light .markdown-body b {
-  color: #020617 !important;
+  color: var(--velox-md-strong) !important;
 }
 
 html.light .markdown-body em,
 html.light .markdown-body i {
-  color: #0f172a;
+  color: var(--velox-md-emphasis);
 }
 
 html.light .markdown-body h1,
@@ -214,70 +275,70 @@ html.light .markdown-body h3,
 html.light .markdown-body h4,
 html.light .markdown-body h5,
 html.light .markdown-body h6 {
-  color: #0f172a;
+  color: var(--velox-md-heading);
 }
 
 html.light .markdown-body h1 {
-  border-bottom: 2px solid #cbd5e1;
+  border-bottom: 2px solid var(--velox-md-h1-border);
 }
 
 html.light .markdown-body h2 {
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--velox-md-h2-border);
 }
 
 html.light .markdown-body a {
-  color: #0284c7;
+  color: var(--velox-md-link);
 }
 
 html.light .markdown-body a:hover {
-  color: #0369a1;
+  color: var(--velox-md-link-hover);
 }
 
 html.light .markdown-body code:not(pre code) {
-  background: #f1f5f9;
-  color: #0369a1;
-  border: 1px solid #cbd5e1;
+  background: var(--velox-md-inline-code-bg);
+  color: var(--velox-md-inline-code-text);
+  border: 1px solid var(--velox-md-inline-code-border);
   font-weight: 600;
 }
 
 html.light .markdown-body pre {
-  background: #1e293b !important;
-  border: 1px solid #94a3b8;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  background: var(--velox-md-pre-bg) !important;
+  border: 1px solid var(--velox-md-pre-border);
+  box-shadow: var(--velox-md-pre-shadow);
 }
 
 html.light .markdown-body blockquote {
-  border-left: 4px solid #0284c7;
-  background: #f0f9ff;
-  color: #334155;
+  border-left: 4px solid var(--velox-md-quote-border);
+  background: var(--velox-md-quote-bg);
+  color: var(--velox-md-quote-text);
 }
 
 html.light .markdown-body table {
-  border: 1px solid #cbd5e1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--velox-md-table-border);
+  box-shadow: var(--velox-md-table-shadow);
 }
 
 html.light .markdown-body th {
-  background: #f8fafc;
-  color: #0f172a;
-  border-bottom: 2px solid #cbd5e1;
+  background: var(--velox-md-th-bg);
+  color: var(--velox-md-th-text);
+  border-bottom: 2px solid var(--velox-md-th-border);
 }
 
 html.light .markdown-body td {
-  border-bottom: 1px solid #e2e8f0;
-  color: #334155;
+  border-bottom: 1px solid var(--velox-md-td-border);
+  color: var(--velox-md-td-text);
 }
 
 html.light .markdown-body tr:nth-child(even) {
-  background: #f8fafc;
+  background: var(--velox-md-row-alt-bg);
 }
 
 html.light .markdown-body tr:hover {
-  background: #f1f5f9;
+  background: var(--velox-md-row-hover-bg);
 }
 
 html.light .markdown-body hr {
-  border-top: 1px solid #cbd5e1;
+  border-top: 1px solid var(--velox-md-hr-border);
 }
 
 /* Headings sizing & spacing.
@@ -350,18 +411,18 @@ html.light .markdown-body hr {
 .markdown-body img {
   max-width: 100%;
   height: auto;
-  border-radius: 0.6rem;
+  border-radius: var(--velox-md-image-radius);
   display: block;
-  margin: 1.4rem auto;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(148, 163, 184, 0.25);
+  margin: var(--velox-md-image-margin);
+  box-shadow: var(--velox-md-image-shadow);
+  border: var(--velox-md-image-border);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   cursor: zoom-in;
 }
 
 .markdown-body img:hover {
   transform: scale(1.015);
-  box-shadow: 0 10px 32px rgba(0, 120, 212, 0.3);
+  box-shadow: var(--velox-md-image-hover-shadow);
 }
 
 .markdown-body blockquote {
@@ -418,7 +479,7 @@ html.light .markdown-body hr {
 /* Interactive Checkboxes */
 .markdown-body input[type="checkbox"] {
   margin-right: 0.6rem;
-  accent-color: #0078d4;
+  accent-color: var(--accent-blue);
   cursor: pointer;
   width: 17px;
   height: 17px;
