@@ -39,6 +39,13 @@ import { SAMPLE_FILES } from './data/samples';
 import { FileTab, MarkdownFileRecord, ViewMode, AppSettings } from './types';
 import { UploadCloud } from 'lucide-react';
 
+/** A queued notification. `kind` controls tint and dwell time. */
+export interface Toast {
+  id: number;
+  message: string;
+  kind: 'info' | 'success' | 'error';
+}
+
 /** Turn an unknown rejection into something worth showing a user. */
 function errorMessage(err: unknown): string {
   if (err instanceof Error && err.message) return err.message;
@@ -124,15 +131,56 @@ export default function App() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
 
-  // Feedback notifications
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Feedback notifications.
+  //
+  // A queue, not a slot. The previous implementation held a single string and
+  // cleared it with a timer that compared by value, so two toasts in quick
+  // succession raced: the first timer could wipe the second message, or the same
+  // message twice would never clear. Each entry now owns its timer, errors stay
+  // up longer, and timers are cancelled on unmount instead of leaking.
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastId = useRef(0);
+  const toastTimers = useRef<Map<number, number>>(new Map());
 
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 2800);
+  // In-flight async work, shown as a pill so opening, saving and exporting never
+  // look dead. Previously none of these had any loading state: clicking Open on
+  // a large file or Save As to a slow disk left the UI frozen with no feedback.
+  const [busy, setBusy] = useState<string | null>(null);
+
+  // Tabs that already got their fanfare. Confetti fired on every single save,
+  // which cheapened it into noise; now it marks the first time a document
+  // actually lands on disk, and Save As of a document that never had a home.
+  const celebratedTabs = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const timers = toastTimers.current;
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      timers.clear();
+    };
   }, []);
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+    const timer = toastTimers.current.get(id);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      toastTimers.current.delete(id);
+    }
+  }, []);
+
+  const showToast = useCallback(
+    (msg: string, kind: Toast['kind'] = 'info') => {
+      const id = ++toastId.current;
+      setToasts((prev) => [...prev.slice(-2), { id, message: msg, kind }]);
+      const timer = window.setTimeout(
+        () => dismissToast(id),
+        kind === 'error' ? 6000 : 2800
+      );
+      toastTimers.current.set(id, timer);
+    },
+    [dismissToast]
+  );
 
   // Persist view preferences the user actually changes.
   //
@@ -275,7 +323,7 @@ export default function App() {
 
     const record = recentFiles.find((f) => f.id === fileId);
     if (!record) {
-      showToast('That document is no longer in your library');
+      showToast('That document is no longer in your library', 'error');
       return;
     }
 
@@ -292,7 +340,7 @@ export default function App() {
         // Deleted or moved on disk: fall back to the library copy rather than
         // refusing to open, but say so.
         console.warn('Could not re-read from disk, using the library copy', err);
-        showToast(`"${record.name}" could not be re-read from disk — showing the saved copy`);
+        showToast(`"${record.name}" could not be re-read from disk — showing the saved copy`, 'error');
       }
     } else if (handle) {
       try {
@@ -411,7 +459,7 @@ export default function App() {
       } catch (err) {
         if (isDialogCancellation(err) || cancelled) return;
         console.error('Could not open requested file', err);
-        showToast(`Could not open that file: ${errorMessage(err)}`);
+        showToast(`Could not open that file: ${errorMessage(err)}`, 'error');
       }
     };
 
@@ -441,6 +489,7 @@ export default function App() {
   // a browser tab.
   const handleOpenLocalFile = useCallback(async () => {
     const fs = getFsAccess();
+    setBusy('Opening…');
     try {
       const doc = await fs.openDocument();
       if (!doc) return; // user cancelled
@@ -448,7 +497,9 @@ export default function App() {
     } catch (err) {
       if (isDialogCancellation(err)) return;
       console.error('Open failed', err);
-      showToast(`Could not open file: ${errorMessage(err)}`);
+      showToast(`Could not open file: ${errorMessage(err)}`, 'error');
+    } finally {
+      setBusy(null);
     }
   }, [adoptDocument, showToast]);
   // Create a new empty markdown document
@@ -611,56 +662,69 @@ export default function App() {
   const handleSave = useCallback(async () => {
     if (!activeTab) return;
     const fs = getFsAccess();
+    setBusy('Saving…');
 
-    // Electron: write to the real path the user opened.
-    if (fs.kind === 'electron' && activeTab.path) {
-      try {
-        await fs.saveInPlace(activeTab.path, activeTab.content);
-        markTabSaved(activeTab.fileId, activeTab.content);
-        await persistToLibrary(activeTab, ['Windows File']);
-        confetti({ particleCount: 25, spread: 40, origin: { y: 0.9, x: 0.1 } });
-        showToast(`Saved to disk: ${activeTab.name}`);
-        return;
-      } catch (err) {
-        if (isDialogCancellation(err)) return;
-        console.error('Save to disk failed', err);
-        showToast(`Could not write to disk: ${errorMessage(err)}`);
-        // Deliberately do not clear the dirty flag: the file on disk is unchanged.
-        return;
-      }
-    }
+    // Celebrate the first time a document actually lands on disk, not every
+    // keystroke-save afterwards.
+    const celebrateOnce = () => {
+      if (celebratedTabs.current.has(activeTab.fileId)) return;
+      celebratedTabs.current.add(activeTab.fileId);
+      confetti({ particleCount: 25, spread: 40, origin: { y: 0.9, x: 0.1 } });
+    };
 
-    // Browser with a handle.
-    if (activeTab.fileHandle && fs.canSaveInPlace) {
-      try {
-        if (await verifyPermission(activeTab.fileHandle, true)) {
-          const writable = await activeTab.fileHandle.createWritable();
-          await writable.write(activeTab.content);
-          await writable.close();
+    try {
+      // Electron: write to the real path the user opened.
+      if (fs.kind === 'electron' && activeTab.path) {
+        try {
+          await fs.saveInPlace(activeTab.path, activeTab.content);
           markTabSaved(activeTab.fileId, activeTab.content);
           await persistToLibrary(activeTab, ['Windows File']);
-          confetti({ particleCount: 25, spread: 40, origin: { y: 0.9, x: 0.1 } });
-          showToast(`Saved: ${activeTab.name}`);
+          celebrateOnce();
+          showToast(`Saved to disk: ${activeTab.name}`, 'success');
+          return;
+        } catch (err) {
+          if (isDialogCancellation(err)) return;
+          console.error('Save to disk failed', err);
+          showToast(`Could not write to disk: ${errorMessage(err)}`, 'error');
+          // Deliberately do not clear the dirty flag: the file on disk is unchanged.
           return;
         }
-        showToast('Permission denied — use "Save As" to choose a location');
-        return;
-      } catch (err) {
-        console.error('Save via handle failed', err);
-        showToast(`Could not save: ${errorMessage(err)}`);
-        return;
       }
-    }
 
-    // No writable destination. Still keep the work in the library so it is not
-    // lost, but say plainly that the file on disk was not touched.
-    try {
-      await persistToLibrary({ ...activeTab, path: undefined }, ['Draft']);
-      markTabSaved(activeTab.fileId, activeTab.content);
-      showToast('Saved to your library only — use "Save As" to write to a file on disk');
-    } catch (err) {
-      console.error('Library save failed', err);
-      showToast(`Could not save: ${errorMessage(err)}`);
+      // Browser with a handle.
+      if (activeTab.fileHandle && fs.canSaveInPlace) {
+        try {
+          if (await verifyPermission(activeTab.fileHandle, true)) {
+            const writable = await activeTab.fileHandle.createWritable();
+            await writable.write(activeTab.content);
+            await writable.close();
+            markTabSaved(activeTab.fileId, activeTab.content);
+            await persistToLibrary(activeTab, ['Windows File']);
+            celebrateOnce();
+            showToast(`Saved: ${activeTab.name}`, 'success');
+            return;
+          }
+          showToast('Permission denied — use "Save As" to choose a location', 'error');
+          return;
+        } catch (err) {
+          console.error('Save via handle failed', err);
+          showToast(`Could not save: ${errorMessage(err)}`, 'error');
+          return;
+        }
+      }
+
+      // No writable destination. Still keep the work in the library so it is not
+      // lost, but say plainly that the file on disk was not touched.
+      try {
+        await persistToLibrary({ ...activeTab, path: undefined }, ['Draft']);
+        markTabSaved(activeTab.fileId, activeTab.content);
+        showToast('Saved to your library only — use "Save As" to write to a file on disk');
+      } catch (err) {
+        console.error('Library save failed', err);
+        showToast(`Could not save: ${errorMessage(err)}`, 'error');
+      }
+    } finally {
+      setBusy(null);
     }
   }, [activeTab, markTabSaved, persistToLibrary, showToast]);
 
@@ -671,7 +735,11 @@ export default function App() {
     const suggestedName = activeTab.name.toLowerCase().endsWith('.md')
       ? activeTab.name
       : `${activeTab.name}.md`;
+    // A document that never had a home just got one - worth marking. Saving
+    // over an existing location is routine and stays quiet.
+    const isFirstHome = !activeTab.path && !activeTab.fileHandle;
 
+    setBusy('Saving…');
     try {
       const doc = await fs.saveDocumentAs(activeTab.content, suggestedName);
       if (!doc) {
@@ -722,12 +790,17 @@ export default function App() {
       await saveFileRecord(record, doc.handle);
       setRecentFiles(await getRecentFiles());
 
-      confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
-      showToast(fs.kind === 'electron' ? `Saved as "${doc.name}"` : `Exported "${doc.name}"`);
+      if (isFirstHome) {
+        celebratedTabs.current.add(activeTab.fileId);
+        confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
+      }
+      showToast(fs.kind === 'electron' ? `Saved as "${doc.name}"` : `Exported "${doc.name}"`, 'success');
     } catch (err) {
       if (isDialogCancellation(err)) return;
       console.error('Save As failed', err);
-      showToast(`Could not save: ${errorMessage(err)}`);
+      showToast(`Could not save: ${errorMessage(err)}`, 'error');
+    } finally {
+      setBusy(null);
     }
   }, [activeTab, recentFiles, persistToLibrary, markTabSaved, showToast]);
   // Change active view mode
@@ -807,7 +880,7 @@ export default function App() {
       showToast('Removed from permanent memory');
     } catch (err) {
       console.error(err);
-      showToast('Could not remove: document storage unavailable');
+      showToast('Could not remove: document storage unavailable', 'error');
     }
   }, [recentFiles, showToast]);
 
@@ -823,7 +896,7 @@ export default function App() {
       showToast('File history cleared');
     } catch (err) {
       console.error(err);
-      showToast('Could not clear history: document storage unavailable');
+      showToast('Could not clear history: document storage unavailable', 'error');
     }
   }, [showToast]);
 
@@ -958,7 +1031,7 @@ export default function App() {
         } catch (err) {
           if (isDialogCancellation(err)) continue;
           console.error('Drop failed', err);
-          showToast(`Could not open "${file.name}": ${errorMessage(err)}`);
+          showToast(`Could not open "${file.name}": ${errorMessage(err)}`, 'error');
         }
       }
     };
@@ -1179,15 +1252,43 @@ export default function App() {
           </div>
         )}
 
+        {/* Busy indicator for async file work */}
+        {busy && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`absolute top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-medium shadow-2xl animate-in fade-in ${
+              isLight
+                ? 'bg-white border-sky-300 text-slate-800 shadow-slate-300/50'
+                : 'bg-slate-900 border-sky-500/50 text-slate-100 shadow-2xl'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-sky-500 animate-ping" aria-hidden="true" />
+            <span>{busy}</span>
+          </div>
+        )}
+
         {/* Toast Notification */}
-        {toastMessage && (
-          <div className={`absolute bottom-4 right-4 z-50 border px-4 py-2.5 rounded-xl text-xs shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-2 ${
-            isLight
-              ? 'bg-white border-sky-300 text-slate-800 shadow-slate-300/50'
-              : 'bg-slate-900 border-sky-500/50 text-slate-100 shadow-2xl'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-sky-500 animate-ping" />
-            <span>{toastMessage}</span>
+        {toasts.length > 0 && (
+          <div role="status" aria-live="polite" className="absolute bottom-4 right-4 z-50 flex flex-col items-stretch gap-2 max-w-sm">
+            {toasts.map((toast) => (
+              <div
+                key={toast.id}
+                onClick={() => dismissToast(toast.id)}
+                className={`border px-4 py-2.5 rounded-xl text-xs shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-2 cursor-pointer ${
+                  isLight
+                    ? toast.kind === 'error'
+                      ? 'bg-white border-rose-400 text-slate-800 shadow-slate-300/50'
+                      : 'bg-white border-sky-300 text-slate-800 shadow-slate-300/50'
+                    : toast.kind === 'error'
+                      ? 'bg-slate-900 border-rose-500/60 text-slate-100 shadow-2xl'
+                      : 'bg-slate-900 border-sky-500/50 text-slate-100 shadow-2xl'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full shrink-0 animate-ping ${toast.kind === 'error' ? 'bg-rose-500' : 'bg-sky-500'}`} />
+                <span>{toast.message}</span>
+              </div>
+            ))}
           </div>
         )}
       </main>
@@ -1248,7 +1349,8 @@ export default function App() {
           const sample = SAMPLE_FILES.find((s) => s.id === sampleId);
           if (!sample) return;
 
-          // The sample list is static but opening delegated to the persisted
+          setBusy('Opening…');
+          try {          // The sample list is static but opening delegated to the persisted
           // record, so once a sample had been cleared from the library the click
           // closed the modal and did nothing at all. Re-seed the record instead.
           const existing = recentFiles.find((r) => r.id === sample.id);
@@ -1270,8 +1372,11 @@ export default function App() {
             await handleOpenFileById(sample.id);
           } catch (err) {
             console.error(err);
-            showToast(`Could not open "${sample.name}": document storage unavailable`);
+            showToast(`Could not open "${sample.name}": document storage unavailable`, 'error');
           }
+        } finally {
+          setBusy(null);
+        }
         }}
         />
       </ErrorBoundary>

@@ -247,6 +247,58 @@ describe('table overflow contract', () => {
   });
 });
 
+describe('feedback contract', () => {
+  it('queues toasts with kinds instead of racing a single slot', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), 'src', 'App.tsx'), 'utf8');
+
+    // The old single-string state and its compare-by-value timer must be gone.
+    expect(src).not.toContain('toastMessage');
+    expect(src).not.toContain('prev === msg');
+    // Kinds drive tint and dwell time.
+    expect(src).toMatch(/kind:\s*'info'\s*\|\s*'success'\s*\|\s*'error'/);
+    expect(src).toContain('role="status"');
+    expect(src).toContain('aria-live="polite"');
+    // Timers are tracked and cancelled on unmount instead of leaking.
+    expect(src).toContain('toastTimers');
+    expect(src).toContain('clearTimeout');
+  });
+
+  it('marks failures as errors and saves as successes', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), 'src', 'App.tsx'), 'utf8');
+    expect(src).toContain("showToast(`Saved to disk:");
+    expect(src).toContain(", 'success')");
+    expect(src).toContain(", 'error')");
+  });
+
+  it('shows a busy indicator around every slow file operation', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), 'src', 'App.tsx'), 'utf8');
+    for (const label of ["Opening…", 'Saving…']) {
+      expect(src, label).toContain(`setBusy('${label}')`);
+    }
+    // Every setBusy must be paired with a clearing finally - an early return or
+    // a throw must not wedge the indicator on.
+    const sets = (src.match(/setBusy\('(?:Opening|Saving)…'\);/g) ?? []).length;
+    const clears = (src.match(/setBusy\(null\);/g) ?? []).length;
+    expect(sets).toBeGreaterThan(0);
+    expect(clears).toBeGreaterThanOrEqual(sets);
+  });
+
+  it('celebrates first disk saves, not every save', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), 'src', 'App.tsx'), 'utf8');
+    expect(src).toContain('celebratedTabs');
+    const confettiCalls = (src.match(/^\s*confetti\(/gm) ?? []).length;
+    expect(confettiCalls).toBe(2);
+  });
+});
+
 describe('editor and shell contract', () => {
   it('defines one monospace stack and uses it everywhere', async () => {
     const fs = await import('node:fs');
