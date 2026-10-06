@@ -35,6 +35,7 @@ export interface VeloxBridge {
     toggleMaximize(): Promise<boolean>;
     isMaximized(): Promise<boolean>;
     close(): Promise<void>;
+    setZoom(fontSize: number): Promise<number>;
     setTitleBarOverlay(options: { color: string; symbolColor: string; height: number }): Promise<boolean>;
     onMaximizeChange(callback: (maximized: boolean) => void): () => void;
   };

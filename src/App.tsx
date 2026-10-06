@@ -46,6 +46,14 @@ export interface Toast {
   kind: 'info' | 'success' | 'error';
 }
 
+/** One tab's undo/redo stacks. See the comment at historyFor. */
+interface UndoState {
+  past: string[];
+  future: string[];
+  lastPushAt: number;
+  lastSeen: string;
+}
+
 /** Turn an unknown rejection into something worth showing a user. */
 function errorMessage(err: unknown): string {
   if (err instanceof Error && err.message) return err.message;
@@ -59,6 +67,23 @@ export default function App() {
   const [fontSize, setFontSize] = useState(16);
   const [wordWrap, setWordWrap] = useState(true);
   const [syncScroll, setSyncScroll] = useState(true);
+
+  // Whole-window zoom in the desktop app, per-pane scaling in a browser tab.
+  //
+  // Zooming only the panes left the toolbar, tab strip and status bar at 12px
+  // next to a 26px document, so in Electron the same 13-26px setting drives
+  // Chromium's zoom factor and the panes render at a fixed base. A plain browser
+  // tab has no such capability, so it keeps the per-pane scaling that already
+  // works there. Either way the persisted setting is honoured on launch.
+  const inElectron = isElectronRuntime();
+  const paneFontSize = inElectron ? 16 : fontSize;
+
+  useEffect(() => {
+    if (!inElectron) return;
+    void getBridge()?.window.setZoom(fontSize).catch(() => {
+      /* A failed zoom must never break the app; panes stay readable. */
+    });
+  }, [fontSize, inElectron]);
 
   // State: Permanent Memory Recent Files
   const [recentFiles, setRecentFiles] = useState<MarkdownFileRecord[]>([]);
@@ -527,23 +552,84 @@ export default function App() {
     showToast(`Created new document: ${name}`);
   }, [tabs.length, showToast]);
 
-  // Update active tab content
-  const handleContentChange = useCallback((newContent: string) => {
-    if (!activeTabId) return;
+  // Per-tab undo history.
+  //
+  // The native textarea undo cannot be trusted here: the editor is a controlled
+  // component that rewrites selections on timers, and preview-side edits never
+  // touch the textarea at all. So every genuine edit funnels through
+  // handleContentChange, which snapshots roughly once per pause in typing, and
+  // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y restore from these stacks instead.
+  const undoRef = useRef(new Map<string, UndoState>());
+  const UNDO_IDLE_MS = 1200;
+  const UNDO_DEPTH = 100;
 
+  const historyFor = (tabId: string, current: string): UndoState => {
+    let h = undoRef.current.get(tabId);
+    if (!h) {
+      h = { past: [], future: [], lastPushAt: 0, lastSeen: current };
+      undoRef.current.set(tabId, h);
+    }
+    return h;
+  };
+
+  const applyContent = useCallback((tabId: string, content: string) => {
+    const h = historyFor(tabId, content);
+    h.lastSeen = content;
     setTabs((prev) =>
-      prev.map((tab) => {
-        if (tab.fileId === activeTabId) {
-          return {
-            ...tab,
-            content: newContent,
-            isDirty: newContent !== tab.originalContent,
-          };
-        }
-        return tab;
-      })
+      prev.map((tab) =>
+        tab.fileId === tabId
+          ? { ...tab, content, isDirty: content !== tab.originalContent }
+          : tab
+      )
     );
-  }, [activeTabId]);
+  }, []);
+
+  // Update active tab content
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      if (!activeTabId) return;
+
+      const prevContent =
+        latestTabsRef.current.find((t) => t.fileId === activeTabId)?.content ?? '';
+      const h = historyFor(activeTabId, prevContent);
+      if (newContent !== h.lastSeen) {
+        // A genuine new edit invalidates the redo stack. Undo/redo restore via
+        // applyContent, which keeps lastSeen in sync, so they never land here.
+        h.future = [];
+        if (Date.now() - h.lastPushAt > UNDO_IDLE_MS) {
+          h.past.push(prevContent);
+          if (h.past.length > UNDO_DEPTH) h.past.shift();
+          h.lastPushAt = Date.now();
+        }
+        h.lastSeen = newContent;
+      }
+
+      applyContent(activeTabId, newContent);
+    },
+    [activeTabId, applyContent]
+  );
+
+  const undoActiveTab = useCallback(() => {
+    if (!activeTabId) return;
+    const h = undoRef.current.get(activeTabId);
+    if (!h || h.past.length === 0) return;
+    const current =
+      latestTabsRef.current.find((t) => t.fileId === activeTabId)?.content ?? '';
+    const prev = h.past.pop() as string;
+    h.future.push(current);
+    applyContent(activeTabId, prev);
+  }, [activeTabId, applyContent]);
+
+  const redoActiveTab = useCallback(() => {
+    if (!activeTabId) return;
+    const h = undoRef.current.get(activeTabId);
+    if (!h || h.future.length === 0) return;
+    const current =
+      latestTabsRef.current.find((t) => t.fileId === activeTabId)?.content ?? '';
+    const next = h.future.pop() as string;
+    h.past.push(current);
+    applyContent(activeTabId, next);
+  }, [activeTabId, applyContent]);
 
   // Debounced autosave.
   //
@@ -829,6 +915,8 @@ export default function App() {
 
     const remaining = tabs.filter((t) => t.fileId !== fileId);
     setTabs(remaining);
+    // Drop its undo history too, or long sessions leak a snapshot per pause.
+    undoRef.current.delete(fileId);
 
     if (activeTabId === fileId) {
       if (remaining.length > 0) {
@@ -953,6 +1041,26 @@ export default function App() {
         // bound — the browser's own print dialog fired on a stale DOM instead.
         e.preventDefault();
         setShowExportModal(true);
+      } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        // App-level undo owns this whenever the focus is in the document (the
+        // editor textarea or the preview surface). Inside a text field of a
+        // dialog or the palette, the native behaviour is left alone.
+        const target = document.activeElement as HTMLElement | null;
+        if (target && target.tagName !== 'TEXTAREA' && (target.tagName === 'INPUT' || target.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+        undoActiveTab();
+      } else if (
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')
+      ) {
+        const target = document.activeElement as HTMLElement | null;
+        if (target && target.tagName !== 'TEXTAREA' && (target.tagName === 'INPUT' || target.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+        redoActiveTab();
       } else if (e.key === 'F1' || ((e.ctrlKey || e.metaKey) && e.key === '/')) {
         e.preventDefault();
         setShowShortcuts((prev) => !prev);
@@ -967,6 +1075,8 @@ export default function App() {
     handleOpenLocalFile,
     handleNewFile,
     handleCloseTab,
+    undoActiveTab,
+    redoActiveTab,
     activeTabId,
     showCommandPalette,
     showShortcuts,
@@ -1159,7 +1269,7 @@ export default function App() {
                 <RawEditor
                   ref={editorRef}
                   content={activeTab.content}
-                  fontSize={fontSize}
+                  fontSize={paneFontSize}
                   wordWrap={wordWrap}
                   theme={theme}
                   targetLine={targetLine}
@@ -1191,7 +1301,7 @@ export default function App() {
                 >
                   <MarkdownPreview
                     content={activeTab.content}
-                    fontSize={fontSize}
+                    fontSize={paneFontSize}
                     theme={theme}
                     onContentChange={handleContentChange}
                     onImageClick={(src, alt) => setLightboxImage({ src, alt })}
@@ -1207,7 +1317,7 @@ export default function App() {
                   <RawEditor
                     ref={editorRef}
                     content={activeTab.content}
-                    fontSize={fontSize}
+                    fontSize={paneFontSize}
                     wordWrap={wordWrap}
                     theme={theme}
                     targetLine={targetLine}
@@ -1246,7 +1356,7 @@ export default function App() {
                     <MarkdownPreview
                       ref={previewRef}
                       content={activeTab.content}
-                      fontSize={fontSize}
+                      fontSize={paneFontSize}
                       theme={theme}
                       compact
                       onContentChange={handleContentChange}

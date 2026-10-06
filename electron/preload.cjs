@@ -17,6 +17,8 @@ const api = {
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
     close: () => ipcRenderer.invoke('window:close'),
+    /** Whole-window zoom factor; the renderer keeps offering 13-26px. */
+    setZoom: (fontSize) => ipcRenderer.invoke('window:set-zoom', Number(fontSize)),
     /** Repaint the native caption buttons; called when the app theme changes. */
     setTitleBarOverlay: (options) =>
       ipcRenderer.invoke('window:set-titlebar-overlay', {

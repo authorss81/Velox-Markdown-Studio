@@ -131,7 +131,6 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                 isLight ? 'hover:bg-slate-100 text-slate-800' : 'hover:bg-slate-800 text-slate-200'
               }`}
               title="Save as another file in Windows (Ctrl+Shift+S)"
- aria-label=""
             >
               <FileDown className="w-4 h-4 text-emerald-500" />
               <span className="hidden md:inline">Save As</span>
@@ -158,7 +157,6 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                   : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Preview Mode: Formatted markdown"
- aria-label=""
             >
               <Eye className="w-4 h-4" />
               <span>Preview</span>
@@ -174,7 +172,6 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                   : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Raw Mode: Monospaced code editor"
- aria-label=""
             >
               <Code className="w-4 h-4" />
               <span>Raw</span>
@@ -190,7 +187,6 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                   : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Split Mode: Side-by-side Raw Editor and Live Preview"
- aria-label=""
             >
               <Columns2 className="w-4 h-4" />
               <span className="hidden lg:inline">Split</span>
@@ -226,7 +222,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('**', '**', 'bold text')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-800 font-bold' : 'hover:bg-slate-800 text-slate-200 font-bold'}`}
               title="Bold (Ctrl+B)"
- aria-label=""
+              aria-label="Bold (Ctrl+B)"
             >
               <Bold className="w-4 h-4" />
             </button>
@@ -234,7 +230,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('*', '*', 'italic text')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-800 italic' : 'hover:bg-slate-800 text-slate-200 italic'}`}
               title="Italic (Ctrl+I)"
- aria-label=""
+              aria-label="Italic (Ctrl+I)"
             >
               <Italic className="w-4 h-4" />
             </button>
@@ -242,7 +238,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('~~', '~~', 'strikethrough')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Strikethrough"
- aria-label=""
+              aria-label="Strikethrough"
             >
               <Strikethrough className="w-4 h-4" />
             </button>
@@ -250,7 +246,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('# ', '', 'Heading 1')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Heading 1"
- aria-label=""
+              aria-label="Heading 1"
             >
               <Heading1 className="w-4 h-4" />
             </button>
@@ -258,7 +254,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('## ', '', 'Heading 2')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Heading 2"
- aria-label=""
+              aria-label="Heading 2"
             >
               <Heading2 className="w-4 h-4" />
             </button>
@@ -266,7 +262,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('> ', '', 'Quote text')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Blockquote"
- aria-label=""
+              aria-label="Blockquote"
             >
               <Quote className="w-4 h-4" />
             </button>
@@ -282,7 +278,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('- [ ] ', '', 'Task item')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Task Checklist"
- aria-label=""
+              aria-label="Task Checklist"
             >
               <CheckSquare className="w-4 h-4" />
             </button>
@@ -290,7 +286,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('- ', '', 'Bullet item')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Bulleted List"
- aria-label=""
+              aria-label="Bulleted List"
             >
               <List className="w-4 h-4" />
             </button>
@@ -298,7 +294,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('| Column 1 | Column 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Insert Table"
- aria-label=""
+              aria-label="Insert Table"
             >
               <TableIcon className="w-4 h-4" />
             </button>
@@ -306,7 +302,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('![Image description](', ')', 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Insert Responsive Image"
- aria-label=""
+              aria-label="Insert Responsive Image"
             >
               <ImageIcon className="w-4 h-4" />
             </button>
@@ -314,7 +310,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('[', '](https://example.com)', 'Link title')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Insert Link"
- aria-label=""
+              aria-label="Insert Link"
             >
               <LinkIcon className="w-4 h-4" />
             </button>
@@ -366,7 +362,6 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                   : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
               }`}
               title="Keyboard Shortcuts Reference (Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+K)"
- aria-label=""
             >
               <Keyboard className="w-4 h-4 text-sky-600 dark:text-sky-400" />
               <span className="hidden md:inline text-2xs">Shortcuts</span>
@@ -380,7 +375,6 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                 isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'
               }`}
               title="Export Document (Download Markdown, HTML, PDF, or copy to clipboard)"
- aria-label=""
             >
               <Share2 className="w-4 h-4 text-purple-500" />
               <span className="hidden sm:inline">Export</span>

@@ -178,6 +178,21 @@ function register() {
   });
 
   /**
+   * Whole-window zoom. Per-pane font scaling leaves the toolbar, tab strip and
+   * status bar at 12px next to a 32px document, so zoom is applied at the
+   * Chromium level and the panes stop scaling themselves. Clamped to the same
+   * 13-26px range the UI offers, expressed as a factor of the 16px base.
+   */
+  ipcMain.handle('window:set-zoom', (_event, fontSize) => {
+    const win = focusedWindow();
+    if (!win || win.isDestroyed()) return 1;
+    const size = Number(fontSize);
+    const clamped = Number.isFinite(size) ? Math.min(26, Math.max(13, size)) : 16;
+    win.webContents.setZoomFactor(clamped / 16);
+    return clamped / 16;
+  });
+
+  /**
    * Repaint the native caption buttons when the app theme changes. Without this
    * the symbols stay whatever colour they were created with, so a dark app ends
    * up with invisible (or unreadable) window controls.

@@ -193,6 +193,16 @@
           record('app namespace present', false, String(e));
         }
 
+        // --- whole-window zoom ------------------------------------------
+        try {
+          const factor = await window.velox.window.setZoom(20);
+          record('setZoom resolves the applied factor', factor === 1.25, String(factor));
+          const back = await window.velox.window.setZoom(16);
+          record('setZoom restores 1.0', back === 1, String(back));
+        } catch (e) {
+          record('setZoom resolves the applied factor', false, String(e));
+        }
+
         // --- pathForFile on a synthetic File must not leak a path --------
         try {
           const synthetic = new File(['x'], 'fake.md');

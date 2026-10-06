@@ -600,6 +600,49 @@ html.light .markdown-body hr {
   margin: 2.2rem 0;
 }
 
+/* Anchored headings and footnote back-references jump here; keep the target
+   clear of the scroll container's top edge. */
+.markdown-body [id] {
+  scroll-margin-top: 1rem;
+}
+
+/* Footnotes */
+.markdown-body .footnote-ref {
+  font-size: 0.85em;
+}
+
+.markdown-body .footnotes {
+  font-size: 0.85em;
+  color: var(--velox-md-quote-text);
+}
+
+.markdown-body .footnotes hr {
+  margin: 2rem 0 1rem;
+}
+
+.markdown-body .footnotes ol {
+  padding-left: 1.5rem;
+}
+
+.markdown-body .footnotes li {
+  margin-bottom: 0.25rem;
+}
+
+/* Definition lists */
+.markdown-body dl {
+  margin-top: 0;
+  margin-bottom: var(--velox-space-flow);
+}
+
+.markdown-body dt {
+  font-weight: 600;
+}
+
+.markdown-body dd {
+  margin: 0 0 0.5rem 1.5rem;
+  padding: 0;
+}
+
 /* ========================================================
    Entrance transitions and scroll-hiding utilities.
    Eleven class usages across the modals, lightbox, find bar and toast

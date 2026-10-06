@@ -1,4 +1,4 @@
-import { Marked } from 'marked';
+import { Marked, type Token } from 'marked';
 import DOMPurify from 'dompurify';
 import { highlightCode, displayLanguage, grammarClass, escapeHtml, ensureLanguages } from './highlight';
 
@@ -119,6 +119,7 @@ const PURIFY_CONFIG = {
     'ul', 'ol', 'li', 'a', 'img', 'figure', 'figcaption',
     'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
     'span', 'div', 'button', 'input', 'sup', 'sub',
+    'dl', 'dt', 'dd', 'section',
     'svg', 'path', 'rect', 'circle', 'line', 'polyline', 'polygon', 'g',
     'defs', 'linearGradient', 'radialGradient', 'stop',
   ],
@@ -149,12 +150,16 @@ const ALLOWED_TASK_ATTR = ['type', 'checked', 'data-task'];
 /**
  * Force safe link behaviour. marked already strips `javascript:` destinations,
  * but a previewed link must never be able to navigate the app window itself
- * (Electron) nor hand the opener to a new tab.
+ * (Electron) nor hand the opener to a new tab. Same-document anchors
+ * (footnote back-references, heading links) are left alone.
  */
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A' && node.hasAttribute('href')) {
-    node.setAttribute('target', '_blank');
-    node.setAttribute('rel', 'noopener noreferrer nofollow');
+    const href = node.getAttribute('href') || '';
+    if (!href.startsWith('#')) {
+      node.setAttribute('target', '_blank');
+      node.setAttribute('rel', 'noopener noreferrer nofollow');
+    }
   }
   if (node.tagName === 'INPUT' && node.getAttribute('type') === 'checkbox') {
     for (const attr of Array.from(node.attributes)) {
@@ -170,13 +175,210 @@ export function parseMarkdown(markdown: string): string {
     // must not block on ~27 dynamic imports, and any fence whose grammar has not
     // arrived yet simply renders as escaped plain text for a frame.
     void ensureLanguages();
+    parseContext = { footnoteOrder: [], footnoteDefs: new Map(), usedSlugs: new Map() };
     const rendered = markedInstance.parse(markdown) as string;
-    return DOMPurify.sanitize(rendered, PURIFY_CONFIG);
+    const withFootnotes = appendFootnoteSection(rendered);
+    parseContext = null;
+    return DOMPurify.sanitize(withFootnotes, PURIFY_CONFIG);
   } catch (err) {
     console.error('Markdown parse error:', err);
+    parseContext = null;
     return '<div class="text-rose-400 p-4">Error rendering markdown.</div>';
   }
 }
+
+/**
+ * Per-parse state for the footnote and heading extensions. `marked` parses
+ * synchronously, so a module slot set at the top of parseMarkdown and cleared
+ * at the bottom cannot leak between documents or keystrokes.
+ */
+interface MarkdownParseContext {
+  /** Labels in order of first reference; the list position is the number. */
+  footnoteOrder: string[];
+  footnoteDefs: Map<string, string>;
+  usedSlugs: Map<string, number>;
+}
+
+let parseContext: MarkdownParseContext | null = null;
+
+/** Labels are interpolated into id and href attributes, so only word-ish ones pass. */
+const SAFE_FOOTNOTE_LABEL = /^[\w][\w-]*$/;
+
+function slugify(html: string): string {
+  const base =
+    html
+      .replace(/<[^>]*>/g, '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'section';
+  const ctx = parseContext;
+  if (!ctx) return base;
+  const seen = ctx.usedSlugs.get(base) ?? 0;
+  ctx.usedSlugs.set(base, seen + 1);
+  return seen === 0 ? base : `${base}-${seen}`;
+}
+
+function appendFootnoteSection(rendered: string): string {
+  const ctx = parseContext;
+  if (!ctx || ctx.footnoteOrder.length === 0) return rendered;
+
+  const items = ctx.footnoteOrder
+    .map((label, i) => {
+      const def = ctx.footnoteDefs.get(label);
+      if (def === undefined) return '';
+      const n = i + 1;
+      let body = '';
+      try {
+        body = markedInstance.parseInline(def) as string;
+      } catch {
+        body = escapeHtml(def);
+      }
+      return `<li id="fn-${n}">${body} <a href="#fnref-${n}" aria-label="Back to content">↩</a></li>`;
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  if (!items) return rendered;
+  return `${rendered}\n<section class="footnotes" aria-label="Footnotes">\n<hr>\n<ol>\n${items}\n</ol>\n</section>\n`;
+}
+
+markedInstance.use({
+  walkTokens(token) {
+    // Collect definitions up front so a reference renders correctly no matter
+    // whether its definition sits above or below it in the document.
+    if (token.type === 'footnoteDef' && parseContext) {
+      const def = token as unknown as { label: string; text: string };
+      if (!parseContext.footnoteDefs.has(def.label)) {
+        parseContext.footnoteDefs.set(def.label, def.text);
+      }
+    }
+  },
+  extensions: [
+    {
+      name: 'footnoteDef',
+      level: 'block',
+      start(src: string) {
+        return src.search(/^\[\^[^\]\n]+\]:/m);
+      },
+      tokenizer(src: string) {
+        const first = /^\[\^([^\]\n]+)\]:[ \t]*([^\n]*)/.exec(src);
+        if (!first) return undefined;
+        const label = (first[1] ?? '').trim();
+        if (!SAFE_FOOTNOTE_LABEL.test(label)) return undefined;
+        const parts = [first[2] ?? ''];
+        let consumed = first[0].length;
+        let rest = src.slice(consumed);
+        // Lazy continuation lines: non-blank lines that do not start a new
+        // definition belong to this one.
+        for (;;) {
+          const next = /^\n([^\n]*)/.exec(rest);
+          if (!next) break;
+          const line = next[1] ?? '';
+          if (line.trim() === '') break;
+          if (/^\[\^[^\]\n]+\]:/.test(line)) break;
+          parts.push(line);
+          consumed += next[0].length;
+          rest = rest.slice(next[0].length);
+        }
+        return {
+          type: 'footnoteDef',
+          raw: src.slice(0, consumed),
+          label,
+          text: parts.join('\n').trim(),
+        };
+      },
+      renderer() {
+        // Consumed from the body; rendered as a section after the parse.
+        return '';
+      },
+    },
+    {
+      name: 'footnoteRef',
+      level: 'inline',
+      start(src: string) {
+        return src.indexOf('[^');
+      },
+      tokenizer(src: string) {
+        const match = /^\[\^([^\]\n]+)\]/.exec(src);
+        if (!match) return undefined;
+        const label = (match[1] ?? '').trim();
+        if (!SAFE_FOOTNOTE_LABEL.test(label)) return undefined;
+        return { type: 'footnoteRef', raw: match[0], label };
+      },
+      renderer(token) {
+        const label = (token as unknown as { label: string }).label;
+        const ctx = parseContext;
+        if (!ctx || !ctx.footnoteDefs.has(label)) {
+          // No definition anywhere in the document: leave the literal text
+          // rather than a link to nowhere.
+          return escapeHtml(`[^${label}]`);
+        }
+        let n = ctx.footnoteOrder.indexOf(label);
+        if (n === -1) {
+          ctx.footnoteOrder.push(label);
+          n = ctx.footnoteOrder.length - 1;
+        }
+        const num = n + 1;
+        return `<sup class="footnote-ref" id="fnref-${num}"><a href="#fn-${num}">${num}</a></sup>`;
+      },
+    },
+    {
+      name: 'deflist',
+      level: 'block',
+      start(src: string) {
+        return src.search(/^[^\n]+\n:[ \t]/m);
+      },
+      tokenizer(
+        this: { lexer: { state: { top: boolean } } },
+        src: string
+      ) {
+        // Only at the top level: inside a list item or blockquote the same
+        // shape is a continuation of that construct, not a new definition list.
+        if (!this.lexer.state.top) return undefined;
+        const match = /^([^\n]+)\n((?::[ \t]*[^\n]*(?:\n|$))+)/.exec(src);
+        if (!match) return undefined;
+        const term = (match[1] ?? '').trim();
+        // Refuse anything that already belongs to another block construct.
+        if (!term || /^\s*(#{1,6}\s|>\s*|[-*+]\s+|\d+[.)]\s+|```|~~~|\||<)/.test(match[1] ?? '')) {
+          return undefined;
+        }
+        const defs = (match[2] ?? '')
+          .split('\n')
+          .map((line) => line.replace(/^:[ \t]*/, '').trim())
+          .filter((line) => line.length > 0);
+        if (defs.length === 0) return undefined;
+        return { type: 'deflist', raw: match[0], term, defs };
+      },
+      renderer(token) {
+        const def = token as unknown as { term: string; defs: string[] };
+        const renderInline = (text: string) => {
+          try {
+            return markedInstance.parseInline(text) as string;
+          } catch {
+            return escapeHtml(text);
+          }
+        };
+        return `<dl><dt>${renderInline(def.term)}</dt>${def.defs
+          .map((d) => `<dd>${renderInline(d)}</dd>`)
+          .join('')}</dl>\n`;
+      },
+    },
+  ],
+});
+
+markedInstance.use({
+  renderer: {
+    heading({ tokens, depth }: { tokens: Token[]; depth: number }) {
+      // marked v18 ships no slugger, so headings carry no anchors. Identifiers
+      // make them linkable (and a future outline clickable) at zero visual cost.
+      const inner = this.parser.parseInline(tokens);
+      return `<h${depth} id="${slugify(inner)}">${inner}</h${depth}>\n`;
+    },
+  },
+});
 
 export function calculateWordCount(text: string): number {
   if (!text) return 0;

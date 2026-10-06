@@ -236,9 +236,17 @@ app.whenReady().then(async () => {
     `preload=${preloadChannels.join(',')} main=${mainChannels.join(',')}`
   );
   record(
-    'all 12 channels declared',
-    preloadChannels.length === 12,
+    'all 13 channels declared',
+    preloadChannels.length === 13,
     `got ${preloadChannels.length}`
+  );
+
+  // The renderer asked for setZoom(20) then setZoom(16) above; the live factor
+  // must have followed both ways, proving the whole-window path end to end.
+  record(
+    'window zoom factor restored to 1.0',
+    win.webContents.getZoomFactor() === 1,
+    `got ${win.webContents.getZoomFactor()}`
   );
 
   // The preload must not expose raw Node to the renderer.
