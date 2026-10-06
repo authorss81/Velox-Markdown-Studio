@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Menu, session, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { register: registerIpc } = require('./ipc.cjs');
+const { register: registerIpc, queueOpenFromArgv, pushPendingOpen, setOpenWindowResolver } = require('./ipc.cjs');
 
 // Remove the default Windows top menu bar
 Menu.setApplicationMenu(null);
@@ -134,29 +134,65 @@ function createWindow() {
     path.join(process.resourcesPath || '', 'app/dist/index.html'),
   ];
 
+  setOpenWindowResolver(() => win);
+
   let resolvedPath = candidatePaths.find((p) => fs.existsSync(p));
   if (resolvedPath) {
     win.loadFile(resolvedPath);
   } else {
-    // Fallback default
+// Fallback default
     win.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  return win;
 }
 
-app.whenReady().then(() => {
-  hardenSession(session.defaultSession);
-  registerIpc();
-  createWindow();
+/**
+ * Single instance. Without it, double-clicking a .md while the app is already
+ * open starts a second process that fights the first one over the same
+ * IndexedDB library and window state. The second process exits immediately and
+ * hands its command line to the primary.
+ */
+const gotTheLock = app.requestSingleInstanceLock();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    // A document was double-clicked while we were already running.
+    queueOpenFromArgv(argv);
+    pushPendingOpen();
+
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
     }
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+  app.whenReady().then(() => {
+    hardenSession(session.defaultSession);
+    registerIpc();
+
+    // A document double-clicked at cold start arrives as argv.
+    queueOpenFromArgv(process.argv);
+
+const win = createWindow();
+
+    // The renderer may not have mounted yet when the push above was attempted,
+    // so it also asks for anything queued via app:consume-pending-open.
+    win.webContents.on('did-finish-load', () => pushPendingOpen());
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
+}

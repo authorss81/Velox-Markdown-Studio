@@ -1,5 +1,6 @@
 const { ipcMain, dialog, BrowserWindow } = require('electron');
 const fs = require('node:fs/promises');
+const fsSync = require('node:fs');
 const path = require('node:path');
 
 /**
@@ -84,6 +85,72 @@ function isCancellation(err) {
   return err && (err.code === 'ERR_CANCELED' || /cancel/i.test(err.message || ''));
 }
 
+/**
+ * A file the OS asked us to open, waiting for the renderer to be ready.
+ *
+ * Windows launches the app with the document path as argv[1] when a .md is
+ * double-clicked. The renderer cannot receive that directly: it may not have
+ * mounted yet, and Electron gives no renderer-side hook for a cold start. So the
+ * request is queued here and either consumed on mount or pushed once the window
+ * exists.
+ */
+let pendingOpenPath = null;
+let resolveOpenWindow = null;
+
+function setOpenWindowResolver(fn) {
+  resolveOpenWindow = fn;
+}
+
+/**
+ * Pull a document path out of a command line.
+ *
+ * Deliberately shape-based rather than positional: argv[0] is the exe in a
+ * packaged app but `electron.exe` in development, and Electron switches such as
+ * `--inspect` can appear anywhere. So a candidate must be an absolute path to an
+ * existing file with an allowed extension before it is believed.
+ */
+function extractOpenPath(argv) {
+  if (!Array.isArray(argv)) return null;
+  for (const arg of argv) {
+    if (typeof arg !== 'string' || arg.length === 0) continue;
+    if (arg.startsWith('-')) continue;
+    if (!path.isAbsolute(arg)) continue;
+    if (!ALLOWED_EXTENSIONS.has(path.extname(arg).toLowerCase())) continue;
+    try {
+      if (!fsSync.statSync(arg).isFile()) continue;
+    } catch {
+      continue;
+    }
+    return arg;
+  }
+  return null;
+}
+
+/** Validate and queue a launch/second-instance request. Returns the path if accepted. */
+function queueOpenFromArgv(argv) {
+  const candidate = extractOpenPath(argv);
+  if (!candidate) return null;
+  pendingOpenPath = candidate;
+  return candidate;
+}
+
+/** Take the queued path, if any. Called by the renderer once it can act on it. */
+function consumePendingOpen() {
+  const queued = pendingOpenPath;
+  pendingOpenPath = null;
+  return queued;
+}
+
+/** Deliver the queued path to a live window, if there is one. */
+function pushPendingOpen() {
+  if (!pendingOpenPath || !resolveOpenWindow) return;
+  const win = resolveOpenWindow();
+  if (!win || win.isDestroyed()) return;
+  const queued = pendingOpenPath;
+  pendingOpenPath = null;
+  win.webContents.send('app:open-file', queued);
+}
+
 function register() {
   // ---- window -------------------------------------------------------------
   ipcMain.handle('window:minimize', () => {
@@ -124,6 +191,11 @@ function register() {
     win.setTitleBarOverlay({ color, symbolColor, height });
     return true;
   });
+
+  // ---- app lifecycle ------------------------------------------------------
+  // Lets the renderer pick up a document the OS asked us to open at launch,
+  // before any push could have been delivered.
+  ipcMain.handle('app:consume-pending-open', () => consumePendingOpen());
 
   // ---- files --------------------------------------------------------------
   ipcMain.handle('fs:open', async () => {
@@ -205,4 +277,13 @@ function register() {
   });
 }
 
-module.exports = { register, isCancellation, ALLOWED_EXTENSIONS, MAX_BYTES };
+module.exports = {
+  register,
+  isCancellation,
+  queueOpenFromArgv,
+  consumePendingOpen,
+  pushPendingOpen,
+  setOpenWindowResolver,
+  ALLOWED_EXTENSIONS,
+  MAX_BYTES,
+};

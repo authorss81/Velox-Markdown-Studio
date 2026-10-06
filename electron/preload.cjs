@@ -32,6 +32,23 @@ const api = {
     },
   },
 
+  /**
+   * Documents the OS asked us to open.
+   *
+   * Double-clicking a .md launches the app with the path as argv. Cold start and
+   * an already-running app need different delivery: on launch the renderer may
+   * not be mounted yet, so it asks for anything queued; afterwards the main
+   * process pushes.
+   */
+  app: {
+    consumePendingOpen: () => ipcRenderer.invoke('app:consume-pending-open'),
+    onOpenFile: (callback) => {
+      const listener = (_event, filePath) => callback(String(filePath));
+      ipcRenderer.on('app:open-file', listener);
+      return () => ipcRenderer.removeListener('app:open-file', listener);
+    },
+  },
+
   fs: {
     /** Native open dialog. Resolves null when the user cancels. */
     open: () => ipcRenderer.invoke('fs:open'),

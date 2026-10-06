@@ -185,6 +185,8 @@ export default function App() {
     );
   }, [theme]);
 
+  
+
   // Load permanent memory recent files on mount
   useEffect(() => {
     getRecentFiles().then((files) => {
@@ -345,6 +347,46 @@ export default function App() {
     },
     [recentFiles, tabs, showToast]
   );
+
+  // Open documents the OS hands us.
+  //
+  // Double-clicking a .md launches the app with the file path in argv, and while
+  // the app is already running Windows re-launches it with the new path. The
+  // association was registered correctly, but nothing consumed either, so the app
+  // opened to the Home screen with the document silently discarded.
+  useEffect(() => {
+    const bridge = getBridge();
+    if (!bridge) return;
+
+    let cancelled = false;
+
+    const openFromDisk = async (filePath: string) => {
+      try {
+        const doc = await getFsAccess().openDroppedPath(filePath);
+        if (cancelled) return;
+        await adoptDocument(doc, 'Windows File', 'Opened');
+      } catch (err) {
+        if (isDialogCancellation(err) || cancelled) return;
+        console.error('Could not open requested file', err);
+        showToast(`Could not open that file: ${errorMessage(err)}`);
+      }
+    };
+
+    // Cold start: the path was queued before this component existed.
+    void bridge.app.consumePendingOpen().then((filePath) => {
+      if (filePath) void openFromDisk(filePath);
+    });
+
+    // Already running: main pushes the path as it arrives.
+    const unsubscribe = bridge.app.onOpenFile((filePath) => {
+      void openFromDisk(filePath);
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [adoptDocument, showToast]);
 
   // Open a file from disk.
   //

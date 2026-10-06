@@ -38,6 +38,13 @@ export interface VeloxBridge {
     setTitleBarOverlay(options: { color: string; symbolColor: string; height: number }): Promise<boolean>;
     onMaximizeChange(callback: (maximized: boolean) => void): () => void;
   };
+  /** A document the OS asked us to open, e.g. by double-clicking a .md file. */
+  app: {
+    /** Take anything queued at launch. Resolves null when there is nothing. */
+    consumePendingOpen(): Promise<string | null>;
+    /** Subscribes to later opens. Returns an unsubscribe function. */
+    onOpenFile(callback: (filePath: string) => void): () => void;
+  };
   fs: {
     open(): Promise<BridgeDocument | null>;
     openPath(filePath: string): Promise<BridgeDocument>;

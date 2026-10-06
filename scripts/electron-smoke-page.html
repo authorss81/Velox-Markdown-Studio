@@ -164,6 +164,35 @@
         } catch (e) {
           record('titlebar height token resolves', false, String(e));
         }
+// --- OS-requested document opens (argv / file association) ---------
+        try {
+          record('app namespace present', !!(window.velox && window.velox.app));
+          const queued = await window.velox.app.consumePendingOpen();
+          // Queued by main from process.argv before this page loaded.
+          record('consumePendingOpen returns the queued document', queued === paths.queued, String(queued));
+
+          const second = await window.velox.app.consumePendingOpen();
+          record('consume is one-shot (second call is empty)', second === null, String(second));
+
+          // A later open (double-clicked while running) arrives as a push. Main
+          // schedules it shortly after this script starts.
+          const got = await new Promise((resolve) => {
+            const timer = setTimeout(() => resolve('TIMEOUT'), 8000);
+            const off = window.velox.app.onOpenFile((p) => {
+              clearTimeout(timer);
+              off();
+              resolve(p);
+            });
+          });
+          record('onOpenFile receives a pushed document', got === paths.pushed, String(got));
+
+          const off2 = window.velox.app.onOpenFile(() => {});
+          record('onOpenFile returns unsubscribe', typeof off2 === 'function');
+          off2();
+        } catch (e) {
+          record('app namespace present', false, String(e));
+        }
+
         // --- pathForFile on a synthetic File must not leak a path --------
         try {
           const synthetic = new File(['x'], 'fake.md');

@@ -18,11 +18,40 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const os = require('node:os');
 
+// Never let a failure in this script pop a native error dialog on the
+// developer's desktop. Write it to the report instead and exit non-zero.
+const REPORT = path.join(__dirname, 'smoke-report.txt');
+try {
+  fs.writeFileSync(REPORT, '', 'utf8');
+} catch {
+  /* ignore */
+}
+process.on('uncaughtException', (err) => {
+  try {
+    fs.appendFileSync(
+      REPORT,
+      `\nUNCAUGHT in smoke harness: ${err && err.stack ? err.stack : String(err)}\n`,
+      'utf8'
+    );
+  } catch {
+    /* ignore */
+  }
+  app.exit(3);
+});
+
 const REPO = process.env.VELOX_REPO ?? path.join(__dirname, '..');
-const { register } = require(path.join(REPO, 'electron', 'ipc.cjs'));
+const {
+  register,
+  queueOpenFromArgv,
+  consumePendingOpen,
+  pushPendingOpen,
+  setOpenWindowResolver,
+} = require(path.join(REPO, 'electron', 'ipc.cjs'));
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'velox-smoke-'));
 const mdPath = path.join(tmp, 'note.md');
+const queuedPath = path.join(tmp, 'queued.md');
+const pushedPath = path.join(tmp, 'pushed.md');
 const otherMdPath = path.join(tmp, 'other.md');
 const exePath = path.join(tmp, 'evil.exe');
 const missingPath = path.join(tmp, 'nope.md');
@@ -34,19 +63,46 @@ fs.writeFileSync(otherMdPath, 'other', 'utf8');
 fs.writeFileSync(exePath, 'MZ binary', 'utf8');
 fs.writeFileSync(hugePath, 'x'.repeat(9 * 1024 * 1024), 'utf8'); // over the 8 MB cap
 fs.writeFileSync(unauthorizedPath, 'untouched', 'utf8');
+fs.writeFileSync(queuedPath, '# queued\n', 'utf8');
+fs.writeFileSync(pushedPath, '# pushed\n', 'utf8');
 
 const EXPECTED = '# Hello\n\noriginal body\n';
 const NEW_CONTENT = '# Hello\n\nrewritten by the smoke test\n';
-
 const results = [];
-const record = (name, pass, detail) => {
+// --- argv extraction: main must pick a document out of a command line -----
+// Asserted here rather than in the page because this is main-process logic and
+// it is what file associations depend on.
+const argvCases = [
+  { label: 'packaged shape [exe, file]', argv: ['C:\\app\\Velox.exe', queuedPath], expect: queuedPath },
+  { label: 'dev shape [electron, script, file]', argv: ['C:\\electron.exe', 'C:\\repo\\main.cjs', queuedPath], expect: queuedPath },
+  { label: 'with electron switches interleaved', argv: ['C:\\electron.exe', '--inspect=9229', '.', queuedPath], expect: queuedPath },
+  { label: 'no document given', argv: ['C:\\app\\Velox.exe'], expect: null },
+  { label: 'only a switch', argv: ['C:\\electron.exe', '--no-sandbox'], expect: null },
+  { label: 'non-markdown file', argv: [exePath], expect: null },
+  { label: 'missing file', argv: [missingPath], expect: null },
+  { label: 'relative path', argv: ['note.md'], expect: null },
+  { label: 'directory, not a file', argv: [tmp], expect: null },
+  { label: 'not an array', argv: null, expect: null },
+];
+for (const c of argvCases) {
+  queueOpenFromArgv(c.argv);
+  const got = consumePendingOpen();
+  record(`argv extraction: ${c.label}`, got === c.expect, `expected ${c.expect}, got ${got}`);
+}
+// Nothing should be left queued after the drain above.
+record('queue fully drained between cases', consumePendingOpen() === null);
+queueOpenFromArgv(['C:\\app\\Velox.exe', queuedPath]);
+
+
+// A function declaration rather than a const arrow, so the argv-extraction cases
+// above can record results before this point in the file.
+function record(name, pass, detail) {
   results.push({ name, pass: !!pass, detail: detail ?? '' });
-};
+}
 
 // Electron on Windows does not reliably flush stdout to a piped parent process,
 // so the report is written to a file. This also avoids any chance of a native
 // error dialog appearing on the desktop.
-const REPORT = path.join(__dirname, 'smoke-report.txt');
 function writeReport(extra = '') {
   const passed = results.filter((r) => r.pass).length;
   const failed = results.filter((r) => !r.pass);
@@ -104,9 +160,19 @@ app.whenReady().then(async () => {
     missing: missingPath,
     huge: hugePath,
     unauthorized: unauthorizedPath,
+    queued: queuedPath,
+    pushed: pushedPath,
     expected: EXPECTED,
     newContent: NEW_CONTENT,
   };
+
+  // Schedule the "opened while already running" case. The renderer subscribes to
+  // app:open-file early in its test run, so this lands while it is listening.
+  setOpenWindowResolver(() => win);
+  setTimeout(() => {
+    queueOpenFromArgv(['C:\\app\\Velox.exe', pushedPath]);
+    pushPendingOpen();
+  }, 2000);
 
   let rendererResults = [];
   try {
@@ -169,7 +235,11 @@ app.whenReady().then(async () => {
     preloadChannels.join('|') === mainChannels.join('|'),
     `preload=${preloadChannels.join(',')} main=${mainChannels.join(',')}`
   );
-  record('all 11 channels declared', preloadChannels.length === 11, `got ${preloadChannels.length}`);
+  record(
+    'all 12 channels declared',
+    preloadChannels.length === 12,
+    `got ${preloadChannels.length}`
+  );
 
   // The preload must not expose raw Node to the renderer.
   record('preload does not expose ipcRenderer', !/exposeInMainWorld\([^)]*ipcRenderer\s*[,)]/.test(preloadSrc));
