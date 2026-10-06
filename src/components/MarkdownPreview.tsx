@@ -171,7 +171,10 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      style={{ fontSize: `${fontSize}px` }}
+      // Drives --preview-fs, which .markdown-body multiplies into its base size.
+      // An inline font-size here would only affect inheriting descendants, which
+      // is why zoom used to leave headings, code and tables untouched.
+      style={{ '--preview-fs': `${fontSize}px` } as React.CSSProperties}
       className={`markdown-body p-6 md:p-10 max-w-4xl mx-auto h-full overflow-y-auto selection:bg-sky-500/30 ${
         theme === 'light' ? 'selection:text-slate-900' : 'selection:text-white'
       }`}

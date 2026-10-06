@@ -36,16 +36,38 @@ describe('preview rhythm contract', () => {
   });
 
   it('keeps heading sizes but removes top dead space from the first block', () => {
-    expect(css).toContain('font-size: 2.15rem;');
-    expect(css).toContain('font-size: 1.65rem;');
-    expect(css).toContain('font-size: 1.35rem;');
-    expect(css).toContain('font-size: 1.15rem;');
+    // Sizes are em so the zoom control scales the whole document; each value
+    // reproduces the previous rem size to the sub-pixel at the default base.
+    expect(css).toContain('font-size: 2.05em;');
+    expect(css).toContain('font-size: 1.57em;');
+    expect(css).toContain('font-size: 1.29em;');
+    expect(css).toContain('font-size: 1.1em;');
+    expect(css).toContain('font-size: 1em;'); // blockquote
+    expect(css).toContain('font-size: 0.93em;'); // tables
+    expect(css).toContain('font-size: 0.91em;'); // fenced code
+    expect(css).not.toMatch(/\.markdown-body (h1|h2|h3|h4|blockquote|table|pre code) \{[^}]*font-size:\s*[\d.]+rem/);
     expect(css).toMatch(/\.markdown-body > :first-child \{\s*margin-top: 0 !important;\s*\}/);
   });
 
+  it('drives the body size from the zoom variable, not a fixed rem', () => {
+    expect(css).toMatch(/\.markdown-body \{[^}]*font-size:\s*calc\(var\(--preview-fs,\s*16px\)\s*\*\s*1\.05\)/);
+  });
+
+  it('wires the zoom prop to the CSS variable in the preview container', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'MarkdownPreview.tsx'),
+      'utf8'
+    );
+    expect(src).toMatch(/'--preview-fs':\s*`?\$\{fontSize\}px/);
+    // The old inline font-size only affected inheriting descendants, which is
+    // why zoom never resized headings, code or tables.
+    expect(src).not.toMatch(/style=\{\{\s*fontSize:/);
+  });
+
   it('uses the shared flow token for blocks and preserves body size', () => {
-    expect(css).toContain('font-size: 1.05rem;');
-    expect(css).toMatch(/line-height: var\(--velox-leading-body\);/);
+    expect(css).toMatch(/font-size:\s*calc\(var\(--preview-fs,\s*16px\)\s*\*\s*1\.05\)/);
     expect(css).toMatch(/margin-bottom: var\(--velox-space-flow\);/);
   });
 

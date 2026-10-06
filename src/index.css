@@ -96,7 +96,10 @@
    ======================================================== */
 .markdown-body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 1.05rem;
+  /* Scales with the zoom control via --preview-fs (set inline on the scroll
+     container, default 16px). 16 * 1.05 reproduces the previous 1.05rem exactly,
+     and every descendant below sizes in em so the whole document zooms as one. */
+  font-size: calc(var(--preview-fs, 16px) * 1.05);
   line-height: var(--velox-leading-body);
 }
 
@@ -354,8 +357,10 @@ html.light .markdown-body hr {
 /* Headings sizing & spacing.
    Fixed rem margins keep section spacing consistent. The previous em margins
    grew with each heading’s own font size, making H1 gaps far larger than H4. */
+/* All sizes in em so the zoom control scales the whole document. Each value
+   reproduces the previous rem size exactly at the default 16px base. */
 .markdown-body h1 {
-  font-size: 2.15rem;
+  font-size: 2.05em;
   font-weight: 700;
   margin-top: var(--velox-space-h1-top);
   margin-bottom: var(--velox-space-h1-bottom);
@@ -363,7 +368,7 @@ html.light .markdown-body hr {
 }
 
 .markdown-body h2 {
-  font-size: 1.65rem;
+  font-size: 1.57em;
   font-weight: 700;
   margin-top: var(--velox-space-h2-top);
   margin-bottom: var(--velox-space-h2-bottom);
@@ -371,14 +376,14 @@ html.light .markdown-body hr {
 }
 
 .markdown-body h3 {
-  font-size: 1.35rem;
+  font-size: 1.29em;
   font-weight: 600;
   margin-top: var(--velox-space-h3-top);
   margin-bottom: var(--velox-space-h3-bottom);
 }
 
 .markdown-body h4 {
-  font-size: 1.15rem;
+  font-size: 1.1em;
   font-weight: 600;
   margin-top: var(--velox-space-h4-top);
   margin-bottom: var(--velox-space-h4-bottom);
@@ -439,7 +444,7 @@ html.light .markdown-body hr {
   padding: 1rem 1.4rem;
   border-radius: 0 0.6rem 0.6rem 0;
   font-style: italic;
-  font-size: 1.05rem;
+  font-size: 1em;
 }
 
 /* Tables */
@@ -449,7 +454,7 @@ html.light .markdown-body hr {
   margin: 1.4rem 0;
   border-radius: 0.6rem;
   overflow: hidden;
-  font-size: 0.98rem;
+  font-size: 0.93em;
 }
 
 .markdown-body th {
@@ -480,7 +485,7 @@ html.light .markdown-body hr {
 
 .markdown-body pre code {
   font-family: "Cascadia Code", Consolas, "Fira Code", monospace;
-  font-size: 0.96rem;
+  font-size: 0.91em;
   line-height: 1.6;
   display: block;
   padding: 1.25rem;
