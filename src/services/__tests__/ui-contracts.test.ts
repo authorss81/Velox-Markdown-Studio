@@ -246,3 +246,65 @@ describe('table overflow contract', () => {
     expect(table).toContain('max-width: 100%');
   });
 });
+
+describe('editor and shell contract', () => {
+  it('defines one monospace stack and uses it everywhere', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'index.css'), 'utf8');
+    expect(css).toMatch(/--font-mono:\s*"Cascadia Code",\s*"Cascadia Mono",\s*Consolas/);
+    expect(css).not.toMatch(/font-family:\s*"Cascadia Code",\s*Consolas/);
+
+    const editor = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'RawEditor.tsx'),
+      'utf8'
+    );
+    expect(editor).toContain("fontFamily: 'var(--font-mono)'");
+    expect(editor).not.toContain('"Cascadia Code", Consolas');
+  });
+
+  it('gives every button a pressed state', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'index.css'), 'utf8');
+    expect(css).toMatch(/button:active:not\(\:disabled\)\s*\{\s*filter:\s*brightness\(0\.93\);\s*\}/);
+  });
+
+  it('does not double-frame code blocks in light mode', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'index.css'), 'utf8');
+    const lightPre = css.match(/html\.light \.markdown-body pre \{[^}]*\}/)?.[0] ?? '';
+    expect(lightPre).toContain('border-color: transparent');
+  });
+
+  it('indents and dedents editor selections as blocks', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'RawEditor.tsx'),
+      'utf8'
+    );
+    expect(src).toContain('e.shiftKey');
+    expect(src).toMatch(/\.map\(\(line\) => \(line\.startsWith\(TAB\)/);
+  });
+
+  it('derives line endings from content instead of hardcoding them', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'StatusBar.tsx'),
+      'utf8'
+    );
+    expect(src).toContain("includes('\\r\\n')");
+    expect(src).not.toMatch(/>\s*CRLF\s*</);
+  });
+
+  it('enforces a usable minimum window size', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), 'electron', 'main.cjs'), 'utf8');
+    expect(src).toContain('minWidth: 900');
+    expect(src).toContain('minHeight: 640');
+  });
+});

@@ -91,8 +91,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
-    minWidth: 800,
-    minHeight: 600,
+    minWidth: 900,
+    minHeight: 640,
     // Hide the native title bar but keep `frame: true`, so the window keeps its
     // native resize borders, snap layouts, Aero Snap and accessibility. Windows
     // then draws the real minimise/maximise/close buttons over our own header via

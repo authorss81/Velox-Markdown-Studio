@@ -12,6 +12,11 @@
    threshold, so both map here. */
 @theme {
   --text-2xs: 0.6875rem;
+
+  /* One monospace stack for the whole app. The editor, the preview's code and
+     Tailwind's font-mono previously resolved to three different faces on
+     Windows (Cascadia vs Consolas); now they cannot diverge. */
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, "Fira Code", monospace;
 }
 
 @layer base {
@@ -24,6 +29,13 @@
   }
   :where(button, a, [role="tab"], [role="option"]):focus:not(:focus-visible) {
     outline: none;
+  }
+
+  /* Pressed state for every button. None of the 73 buttons had one, so clicks
+     gave no tactile feedback. Instant by design: press feedback should land on
+     the frame the finger is down, not ease in afterwards. */
+  button:active:not(:disabled) {
+    filter: brightness(0.93);
   }
 }
 
@@ -268,7 +280,6 @@ html.light .markdown-body {
   --velox-md-inline-code-text: #0369a1;
   --velox-md-inline-code-border: #cbd5e1;
   --velox-md-pre-bg: #1e293b;
-  --velox-md-pre-border: #94a3b8;
   --velox-md-pre-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   --velox-md-quote-border: #0284c7;
   --velox-md-quote-bg: #f0f9ff;
@@ -333,7 +344,9 @@ html.light .markdown-body code:not(pre code) {
 
 html.light .markdown-body pre {
   background: var(--velox-md-pre-bg) !important;
-  border: 1px solid var(--velox-md-pre-border);
+  /* The renderer wraps every fence in its own bordered card, so a second
+     border here draws a double frame in light mode. The wrapper is the frame. */
+  border-color: transparent;
   box-shadow: var(--velox-md-pre-shadow);
 }
 
@@ -492,7 +505,7 @@ html.light .markdown-body hr {
 .markdown-body code:not(pre code) {
   padding: 0.2rem 0.45rem;
   border-radius: 0.35rem;
-  font-family: "Cascadia Code", Consolas, "Fira Code", monospace;
+  font-family: var(--font-mono);
   font-size: 0.92em;
 }
 
@@ -505,7 +518,7 @@ html.light .markdown-body hr {
 }
 
 .markdown-body pre code {
-  font-family: "Cascadia Code", Consolas, "Fira Code", monospace;
+  font-family: var(--font-mono);
   font-size: 0.91em;
   line-height: 1.6;
   display: block;

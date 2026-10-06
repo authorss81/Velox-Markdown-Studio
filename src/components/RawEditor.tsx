@@ -128,7 +128,7 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
     return () => window.clearTimeout(id);
   }, [targetLine, scrollToLine, onTargetLineHandled]);
 
-  // Handle keyboard shortcuts (Tab, Ctrl+F, Ctrl+H, Ctrl+B, Ctrl+I)
+  // Handle keyboard shortcuts (Tab, Shift+Tab, Ctrl+F, Ctrl+H, Ctrl+B, Ctrl+I)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -137,13 +137,59 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
       e.preventDefault();
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
+      const TAB = '  ';
 
-      // Insert 2 spaces
-      const newText = content.substring(0, start) + '  ' + content.substring(end);
+      if (e.shiftKey) {
+        // Dedent: remove up to 2 leading spaces from every selected line, or
+        // from the current line when nothing is selected.
+        const selStartLine = contentRef.current.lastIndexOf('\n', start - 1) + 1;
+        const selEndLine = contentRef.current.indexOf('\n', end);
+        const blockEnd = selEndLine === -1 ? contentRef.current.length : selEndLine;
+        const block = contentRef.current.substring(selStartLine, blockEnd);
+        const dedented = block
+          .split('\n')
+          .map((line) => (line.startsWith(TAB) ? line.slice(2) : line.startsWith(' ') ? line.slice(1) : line))
+          .join('\n');
+        const removed = block.length - dedented.length;
+        const newText = contentRef.current.substring(0, selStartLine) + dedented + contentRef.current.substring(blockEnd);
+        onChange(newText);
+        setTimeout(() => {
+          // Clamp the restored selection by how much leading whitespace vanished.
+          const deltaStart = Math.min(2, start - selStartLine);
+          textarea.selectionStart = Math.max(selStartLine, start - deltaStart);
+          textarea.selectionEnd = Math.max(selStartLine, end - removed);
+          updateCursorPosition();
+        }, 0);
+        return;
+      }
+
+      // Indent: a multi-line selection indents as a block, a caret inserts two
+      // spaces. Previously Tab inserted blindly with no dedent and no way out.
+      if (start !== end && contentRef.current.substring(start, end).includes('\n')) {
+        const selStartLine = contentRef.current.lastIndexOf('\n', start - 1) + 1;
+        const selEndLine = contentRef.current.indexOf('\n', end);
+        const blockEnd = selEndLine === -1 ? contentRef.current.length : selEndLine;
+        const block = contentRef.current.substring(selStartLine, blockEnd);
+        const lines = block.split('\n').length;
+        const indented = block
+          .split('\n')
+          .map((line) => TAB + line)
+          .join('\n');
+        const newText = contentRef.current.substring(0, selStartLine) + indented + contentRef.current.substring(blockEnd);
+        onChange(newText);
+        setTimeout(() => {
+          textarea.selectionStart = start + TAB.length;
+          textarea.selectionEnd = end + TAB.length * lines;
+          updateCursorPosition();
+        }, 0);
+        return;
+      }
+
+      const newText = contentRef.current.substring(0, start) + TAB + contentRef.current.substring(end);
       onChange(newText);
 
       setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 2;
+        textarea.selectionStart = textarea.selectionEnd = start + TAB.length;
         updateCursorPosition();
       }, 0);
     } else if (e.ctrlKey && e.key.toLowerCase() === 'f') {
@@ -384,7 +430,10 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
         } ${wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre overflow-x-auto'}`}
         style={{
           fontSize: `${fontSize}px`,
-          fontFamily: '"Cascadia Code", Consolas, "Fira Code", monospace',
+          // The single --font-mono stack from @theme: the textarea, the preview
+          // code and font-mono utilities previously resolved to three different
+          // faces on Windows.
+          fontFamily: 'var(--font-mono)',
           lineHeight: '1.5rem',
           tabSize: 2,
         }}

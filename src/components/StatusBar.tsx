@@ -20,6 +20,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   const wordCount = React.useMemo(() => calculateWordCount(content), [content]);
   const charCount = content.length;
   const readTime = React.useMemo(() => calculateReadingTime(wordCount), [wordCount]);
+  // Was a hardcoded "CRLF" literal. The editor writes content verbatim, so the
+  // endings are whatever the document actually contains - overwhelmingly LF.
+  const lineEnding = content.includes('\r\n') ? 'CRLF' : 'LF';
   const isLight = theme === 'light';
 
   return (
@@ -71,10 +74,17 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       <div className="flex items-center gap-3 flex-shrink-0 font-mono text-xs">
         {activeTab && (
           <>
-            <span className="hidden sm:inline font-medium">
-              Ln {cursorLine}, Col {cursorCol}
-            </span>
-            <span className={`h-3.5 w-px hidden sm:block ${isLight ? 'bg-slate-300' : 'bg-slate-700/80'}`} />
+            {/* The cursor position only updates while the raw editor is mounted.
+                Showing it in preview mode displayed a stale line and column from
+                whatever was typed last, so it is hidden there instead of lying. */}
+            {activeTab.viewMode !== 'preview' && (
+              <>
+                <span className="hidden sm:inline font-medium">
+                  Ln {cursorLine}, Col {cursorCol}
+                </span>
+                <span className={`h-3.5 w-px hidden sm:block ${isLight ? 'bg-slate-300' : 'bg-slate-700/80'}`} />
+              </>
+            )}
             <span className="font-medium">{wordCount} words ({charCount} chars)</span>
             <span className={`h-3.5 w-px hidden lg:block ${isLight ? 'bg-slate-300' : 'bg-slate-700/80'}`} />
             <span className="hidden lg:inline">{readTime} min read</span>
@@ -83,7 +93,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         <span className={`h-3.5 w-px ${isLight ? 'bg-slate-300' : 'bg-slate-700/80'}`} />
         <span className={`font-semibold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>UTF-8</span>
         <span className={`h-3.5 w-px ${isLight ? 'bg-slate-300' : 'bg-slate-700/80'}`} />
-        <span className={`font-semibold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>CRLF</span>
+        <span className={`font-semibold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{lineEnding}</span>
         <span className={`h-3.5 w-px hidden sm:block ${isLight ? 'bg-slate-300' : 'bg-slate-700/80'}`} />
         <span className="text-sky-600 dark:text-sky-400 font-sans font-semibold hidden sm:inline">Markdown (GFM)</span>
       </div>

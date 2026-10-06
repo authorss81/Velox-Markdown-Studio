@@ -124,7 +124,6 @@ describe('preview color tokens', () => {
     '--velox-md-inline-code-text': '#0369a1',
     '--velox-md-inline-code-border': '#cbd5e1',
     '--velox-md-pre-bg': '#1e293b',
-    '--velox-md-pre-border': '#94a3b8',
     '--velox-md-pre-shadow': '0 4px 16px rgba(0, 0, 0, 0.12)',
     '--velox-md-quote-border': '#0284c7',
     '--velox-md-quote-bg': '#f0f9ff',
@@ -163,8 +162,9 @@ describe('preview color tokens', () => {
 
     for (const declaration of themedColorDeclarations(theme)) {
       // Token definitions are checked above; every rendered color declaration
-      // must consume one.
+      // must consume one. `transparent` is the absence of a color, not one.
       if (declaration.includes('--velox-md-')) continue;
+      if (/:\s*transparent\s*;/.test(declaration)) continue;
       expect(declaration).toMatch(/var\(--velox-md-[a-z-]+\)/);
     }
   });
