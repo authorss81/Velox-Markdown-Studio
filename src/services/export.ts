@@ -67,16 +67,18 @@ export function generateStandaloneHtml(filename: string, htmlBody: string): stri
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      line-height: 1.75;
+      line-height: 1.62;
       color: #1e293b;
       max-width: 860px;
       margin: 40px auto;
       padding: 0 24px;
       background-color: #ffffff;
     }
-    h1, h2, h3, h4, h5, h6 { font-weight: 700; color: #0f172a; margin-top: 1.6em; margin-bottom: 0.6em; }
-    h1 { font-size: 2.2rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.3em; }
-    h2 { font-size: 1.6rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.3em; }
+    h1, h2, h3, h4, h5, h6 { font-weight: 700; color: #0f172a; }
+    h1 { font-size: 2.2rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.3em; margin: 2.25rem 0 0.75rem; }
+    h1:first-child { margin-top: 0; }
+    h2 { font-size: 1.6rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.3em; margin: 2rem 0 0.625rem; }
+    p, ul, ol, blockquote, table { margin-top: 0; margin-bottom: 1rem; }
     blockquote { border-left: 4px solid #0078d4; background: rgba(0, 120, 212, 0.08); padding: 12px 18px; margin: 16px 0; border-radius: 0 8px 8px 0; color: #334155; font-style: italic; }
     code { font-family: "Cascadia Code", Consolas, monospace; background: #f1f5f9; color: #0284c7; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
     pre { background: #0f172a; color: #f8fafc; padding: 18px; border-radius: 8px; overflow-x: auto; margin: 18px 0; }
