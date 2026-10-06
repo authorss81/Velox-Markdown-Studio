@@ -37,7 +37,7 @@ import { getFsAccess, isDialogCancellation, type DocumentFile } from './services
 import { getBridge, isElectronRuntime } from './types/ipc';
 import { SAMPLE_FILES } from './data/samples';
 import { FileTab, MarkdownFileRecord, ViewMode, AppSettings } from './types';
-import { UploadCloud } from 'lucide-react';
+import { ArrowDownToLine } from 'lucide-react';
 
 /** A queued notification. `kind` controls tint and dwell time. */
 export interface Toast {
@@ -948,6 +948,11 @@ export default function App() {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setShowCommandPalette((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        // Documented in the shortcuts reference and the palette, but never
+        // bound — the browser's own print dialog fired on a stale DOM instead.
+        e.preventDefault();
+        setShowExportModal(true);
       } else if (e.key === 'F1' || ((e.ctrlKey || e.metaKey) && e.key === '/')) {
         e.preventDefault();
         setShowShortcuts((prev) => !prev);
@@ -1051,14 +1056,16 @@ export default function App() {
   const isLight = theme === 'light';
 
   return (
-    <div className={`h-screen w-screen flex flex-col overflow-hidden font-sans transition-colors duration-150 ${
+    <div className={`relative h-screen w-screen flex flex-col overflow-hidden font-sans transition-colors duration-150 ${
       isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'
     }`}>
       {/* Drag & Drop Visual Overlay */}
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-sky-500/15 backdrop-blur-sm border-4 border-dashed border-sky-500 flex flex-col items-center justify-center pointer-events-none animate-in fade-in">
           <div className="p-6 rounded-3xl bg-slate-900/95 text-white shadow-2xl border border-sky-400 flex flex-col items-center gap-3">
-            <UploadCloud className="w-14 h-14 text-sky-400 animate-bounce" />
+            {/* A download affordance for a drop target: the files land on disk,
+                nothing is uploaded anywhere, so an upload glyph lies. */}
+            <ArrowDownToLine className="w-14 h-14 text-sky-400 animate-bounce" />
             <div className="text-base font-bold">Drop Markdown files here to open</div>
             <div className="text-xs text-slate-400">Supports .md, .markdown, .txt</div>
           </div>
@@ -1241,6 +1248,7 @@ export default function App() {
                       content={activeTab.content}
                       fontSize={fontSize}
                       theme={theme}
+                      compact
                       onContentChange={handleContentChange}
                       onScrollPercentage={handlePreviewScrollPercentage}
                       onImageClick={(src, alt) => setLightboxImage({ src, alt })}
@@ -1285,7 +1293,7 @@ export default function App() {
                       : 'bg-slate-900 border-sky-500/50 text-slate-100 shadow-2xl'
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full shrink-0 animate-ping ${toast.kind === 'error' ? 'bg-rose-500' : 'bg-sky-500'}`} />
+                <span className={`w-2 h-2 rounded-full shrink-0 ${toast.kind === 'error' ? 'bg-rose-500' : 'bg-sky-500'}`} />
                 <span>{toast.message}</span>
               </div>
             ))}

@@ -247,6 +247,92 @@ describe('table overflow contract', () => {
   });
 });
 
+describe('iconography and chrome contract', () => {
+  it('uses download semantics for a drop target, not upload', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), 'src', 'App.tsx'), 'utf8');
+    expect(src).toContain('ArrowDownToLine');
+    expect(src).not.toContain('UploadCloud');
+  });
+
+  it('distinguishes Export from Save As and panes from actions', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'CommandBar.tsx'),
+      'utf8'
+    );
+    expect(src).toContain('Share2');
+    expect(src).toContain('SquareCode');
+    // Code stays for the Raw view-mode segment; it must not double as the
+    // inline-code insert glyph anymore.
+    const inlineCodeBlock =
+      src.match(/onInsertMarkdown\('`', '`', 'code'\)[\s\S]*?<SquareCode/)?.[0] ?? '';
+    expect(inlineCodeBlock).not.toBe('');
+  });
+
+  it('uses no emoji in the chrome or generated markup', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const root = process.cwd();
+    for (const file of [
+      'src/services/markdown.ts',
+      'src/components/MarkdownPreview.tsx',
+    ]) {
+      const src = fs.readFileSync(path.join(root, file), 'utf8');
+      expect(src, file).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
+    }
+  });
+
+  it('keeps the light tab strip legible', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'TabBar.tsx'),
+      'utf8'
+    );
+    expect(src).toContain('bg-slate-100 border-slate-300');
+    expect(src).not.toContain('bg-slate-200/90');
+  });
+
+  it('shares one sans stack between chrome and document', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'index.css'), 'utf8');
+    expect(css).toMatch(/--font-sans:\s*"Segoe UI Variable Text",\s*"Segoe UI"/);
+    expect(css).toContain('font-family: var(--font-sans);');
+  });
+
+  it('does not pulse transient toast indicators', async () => {
+    // The busy pill keeps its pulse: it is a transient activity indicator, not
+    // a persistent badge. Toasts are transient too, but theirs added a fourth
+    // simultaneous pulse for no information.
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), 'src', 'App.tsx'), 'utf8');
+    const at = src.indexOf('{toasts.map((toast) => (');
+    expect(at, 'toast block found').toBeGreaterThan(-1);
+    const toastBlock = src.slice(at, at + 1500);
+    expect(toastBlock).not.toContain('animate-ping');
+  });
+
+  it('lets the browser skip off-screen gutter rows', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'index.css'), 'utf8');
+    expect(css).toContain('.velox-gutter-row');
+    expect(css).toContain('content-visibility: auto');
+    const editor = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'RawEditor.tsx'),
+      'utf8'
+    );
+    expect(editor).toContain('velox-gutter-row');
+    expect(editor).toContain('min-w-12');
+    expect(editor).not.toMatch(/className=\{`w-12 py-4/);
+  });
+});
+
 describe('feedback contract', () => {
   it('queues toasts with kinds instead of racing a single slot', async () => {
     const fs = await import('node:fs');

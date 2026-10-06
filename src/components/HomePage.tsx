@@ -117,7 +117,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={onOpenLocalFile}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white font-medium text-xs shadow-md shadow-sky-900/30 transition hover:scale-[1.02]"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white font-medium text-xs shadow-md shadow-sky-900/30 transition-transform hover:scale-[1.02]"
               title="Open any .md file directly from Windows File Explorer (Ctrl+O)"
             >
               <FolderOpen className="w-4 h-4" />
@@ -139,7 +139,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             <button
               onClick={onOpenSampleLibrary}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-medium text-xs border transition ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-xs border transition ${
                 isLight
                   ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-sm'
                   : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'
@@ -177,7 +177,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search across all indexed Markdown files (type keywords like 'consensus', 'guide', 'Windows', 'API', etc.)..."
+              placeholder="Search files and contents…"
               className={`w-full border rounded-2xl pl-11 pr-24 py-3 text-sm transition shadow-inner ${
                 isLight
                   ? 'bg-white border-slate-300 focus:border-sky-500 text-slate-900 placeholder-slate-400'
@@ -270,9 +270,19 @@ export const HomePage: React.FC<HomePageProps> = ({
                         {snippets.map((snip, idx) => (
                           <div
                             key={idx}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Jump to line ${snip.lineNumber} in ${file.name}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               onOpenFileById(file.id, snip.lineNumber);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onOpenFileById(file.id, snip.lineNumber);
+                              }
                             }}
                             className={`flex items-start gap-2.5 text-xs font-mono leading-relaxed p-1 rounded transition hover:bg-sky-500/10 ${
                               isLight ? 'text-slate-700' : 'text-slate-300'
@@ -321,8 +331,17 @@ export const HomePage: React.FC<HomePageProps> = ({
               {pinnedFiles.map((file) => (
                 <div
                   key={file.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${file.name}`}
                   onClick={() => onOpenFileById(file.id)}
-                  className={`group relative rounded-2xl border p-4 transition-all duration-200 cursor-pointer shadow-md hover:translate-y-[-2px] ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onOpenFileById(file.id);
+                    }
+                  }}
+                  className={`group relative rounded-2xl border p-4 transition-[transform,border-color,box-shadow] duration-200 cursor-pointer shadow-md hover:translate-y-[-2px] ${
                     isLight
                       ? 'bg-white border-slate-200 hover:border-sky-500 shadow-slate-200/50'
                       : 'bg-slate-900/90 border-slate-800 hover:border-sky-500/50 hover:shadow-sky-950/30'
@@ -351,7 +370,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   </div>
 
                   <p className={`text-xs line-clamp-2 mt-2 leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                    {file.content.replace(/^#+\s+/gm, '').substring(0, 140)}...
+                    {file.content.replace(/^#+\s+/gm, '').substring(0, 140)}
                   </p>
 
                   <div className={`flex items-center justify-between mt-4 pt-3 border-t text-2xs text-[var(--velox-muted)] ${

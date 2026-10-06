@@ -128,10 +128,18 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
     return () => window.clearTimeout(id);
   }, [targetLine, scrollToLine, onTargetLineHandled]);
 
-  // Handle keyboard shortcuts (Tab, Shift+Tab, Ctrl+F, Ctrl+H, Ctrl+B, Ctrl+I)
+  // Handle keyboard shortcuts (Tab, Shift+Tab, Esc, Ctrl+F, Ctrl+H, Ctrl+B, Ctrl+I)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
+
+    // Tab inserts indentation, so keyboard users can never Tab out of the editor
+    // by pressing Tab. Escape is the documented exit hatch: it drops focus back
+    // to the page, where Tab works normally again.
+    if (e.key === 'Escape') {
+      textarea.blur();
+      return;
+    }
 
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -396,7 +404,7 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
       {/* Line Numbers Gutter */}
       <div
         ref={lineNumbersRef}
-        className={`w-12 py-4 select-none text-right pr-3 border-r overflow-hidden text-xs leading-relaxed shrink-0 tabular-nums transition-colors ${
+        className={`min-w-12 py-4 select-none text-right pr-3 border-r overflow-hidden text-xs leading-relaxed shrink-0 tabular-nums transition-colors ${
           // Line numbers were 2.56:1 (dark) and 2.34:1 (light) - the one element
           // stared at continuously while navigating, and illegible. The dark
           // gutter also used a third unrelated near-black (#090d16) next to the
@@ -405,11 +413,11 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
         }`}
         style={{ fontSize: `${fontSize}px` }}
       >
-        {lines.map((_, i) => (
-          <div key={i} className="h-6">
-            {i + 1}
-          </div>
-        ))}
+          {lines.map((_, i) => (
+            <div key={i} className="h-6 velox-gutter-row">
+              {i + 1}
+            </div>
+          ))}
       </div>
 
       {/* Monospaced Textarea Editor */}
@@ -420,6 +428,7 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
         onScroll={handleScroll}
         onKeyUp={updateCursorPosition}
         onClick={updateCursorPosition}
+        onSelect={updateCursorPosition}
         onKeyDown={handleKeyDown}
         spellCheck={false}
         placeholder="Type Markdown content here..."

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { FileText } from 'lucide-react';
 import { parseMarkdown } from '../services/markdown';
 import { ensureLanguages } from '../services/highlight';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -11,6 +12,8 @@ interface MarkdownPreviewProps {
   content: string;
   theme?: 'dark' | 'light';
   fontSize?: number;
+  /** Compact padding for split mode so both text columns share a top edge. */
+  compact?: boolean;
   onImageClick?: (src: string, alt: string) => void;
   onContentChange?: (updatedContent: string) => void;
   onScrollPercentage?: (percentage: number) => void;
@@ -20,11 +23,13 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
   content,
   theme = 'dark',
   fontSize = 16,
+  compact = false,
   onImageClick,
   onContentChange,
   onScrollPercentage,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const copyTimer = useRef<number | null>(null);
 
   // highlight.js grammars are dynamically imported so they land in their own
   // chunks instead of bloating the bundle. That makes them arrive a moment after
@@ -88,24 +93,42 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       // 1. Handle interactive checklist click
       if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox') {
         const checkbox = target as HTMLInputElement;
+        // Only drive checkboxes this renderer produced. A stray raw-HTML input
+        // has no data-task and no source line, so toggling it would rewrite the
+        // wrong line.
+        if (!checkbox.hasAttribute('data-task')) return;
+        // The rewrite below drives the visual state; letting the input flip
+        // natively first would desync it whenever there is no onContentChange.
+        e.preventDefault();
         if (onContentChange) {
-          const allCheckboxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+          const allCheckboxes = Array.from(container.querySelectorAll('input[data-task]'));
           const checkboxIndex = allCheckboxes.indexOf(checkbox);
 
           if (checkboxIndex !== -1) {
-            const regex = /^(\s*[-*+]\s*\[)([ xX])(\])/gm;
-            let matchCount = 0;
-            const updated = content.replace(regex, (match, prefix, state, suffix) => {
-              if (matchCount === checkboxIndex) {
-                matchCount++;
-                const newState = state === ' ' ? 'x' : ' ';
-                return `${prefix}${newState}${suffix}`;
+            // Rewrite only outside fenced code blocks. A "- [ ]" line inside a
+            // fence has no checkbox, so counting it would shift every later
+            // index and corrupt the fence on toggle.
+            const lines = content.split('\n');
+            let inFence = false;
+            let seen = -1;
+            const out = lines.map((line) => {
+              if (/^\s*(```|~~~)/.test(line)) {
+                inFence = !inFence;
+                return line;
               }
-              matchCount++;
-              return match;
+              if (inFence) return line;
+              return line.replace(
+                /^(\s*(?:[-*+]|\d+[.)])\s*\[)([ xX])(\])/,
+                (match, prefix, state, suffix) => {
+                  seen++;
+                  return seen === checkboxIndex
+                    ? `${prefix}${state === ' ' ? 'x' : ' '}${suffix}`
+                    : match;
+                }
+              );
             });
 
-            onContentChange(updated);
+            onContentChange(out.join('\n'));
           }
         }
         return;
@@ -118,16 +141,14 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
         const code = decodeURIComponent(copyBtn.getAttribute('data-code') || '');
         if (code) {
           navigator.clipboard.writeText(code).then(() => {
-            const span = copyBtn.querySelector('span');
-            if (span) {
-              const original = span.textContent;
-              span.textContent = 'Copied!';
-              copyBtn.classList.add('text-emerald-400');
-              setTimeout(() => {
-                span.textContent = original;
-                copyBtn.classList.remove('text-emerald-400');
-              }, 1800);
-            }
+            // Attribute-driven feedback, not textContent mutation: React owns
+            // this subtree and clobbers direct DOM writes on the next render.
+            copyBtn.setAttribute('data-copied', 'true');
+            const pending = copyTimer.current;
+            if (pending !== null) window.clearTimeout(pending);
+            copyTimer.current = window.setTimeout(() => {
+              copyBtn.removeAttribute('data-copied');
+            }, 1800);
           });
         }
         return;
@@ -142,8 +163,23 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     };
 
     container.addEventListener('click', handleContainerClick);
+
+    // Broken-image state without inline handlers (CSP blocks those). Error
+    // events do not bubble, so this listens in the capture phase.
+    const handleImageError = (e: Event) => {
+      const img = e.target as HTMLElement;
+      if (img.tagName !== 'IMG') return;
+      img.closest('figure')?.classList.add('md-img-broken');
+    };
+    container.addEventListener('error', handleImageError, true);
+
     return () => {
       container.removeEventListener('click', handleContainerClick);
+      container.removeEventListener('error', handleImageError, true);
+      if (copyTimer.current !== null) {
+        window.clearTimeout(copyTimer.current);
+        copyTimer.current = null;
+      }
     };
   }, [htmlContent, content, onImageClick, onContentChange]);
 
@@ -155,7 +191,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-3 ${
           theme === 'light' ? 'bg-slate-100 border border-slate-200 text-sky-600' : 'bg-slate-900 border border-slate-800 text-sky-400'
         }`}>
-          📝
+          <FileText className="w-5 h-5" aria-hidden="true" />
         </div>
         <p className={`text-sm font-medium ${theme === 'light' ? 'text-slate-700' : 'text-slate-300'}`}>
           Empty Document
@@ -175,7 +211,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       // An inline font-size here would only affect inheriting descendants, which
       // is why zoom used to leave headings, code and tables untouched.
       style={{ '--preview-fs': `${fontSize}px` } as React.CSSProperties}
-      className={`markdown-body p-6 md:p-10 max-w-4xl mx-auto h-full overflow-y-auto selection:bg-sky-500/30 ${
+      className={`markdown-body ${compact ? 'px-4 py-4' : 'p-6 md:p-10'} max-w-4xl mx-auto h-full overflow-y-auto selection:bg-sky-500/30 ${
         theme === 'light' ? 'selection:text-slate-900' : 'selection:text-white'
       }`}
       dangerouslySetInnerHTML={{ __html: htmlContent }}

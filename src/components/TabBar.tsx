@@ -39,7 +39,7 @@ export const TabBar: React.FC<TabBarProps> = ({
         next?.click();
       }}
       className={`h-[42px] border-b flex items-center px-4 gap-1.5 overflow-x-auto select-none no-scrollbar transition-colors duration-150 ${
-        isLight ? 'bg-slate-200/90 border-slate-300' : 'bg-slate-950 border-slate-800'
+        isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'
       }`}>
       {/* Home tab */}
       <button
@@ -47,7 +47,7 @@ export const TabBar: React.FC<TabBarProps> = ({
         aria-selected={activeTabId === null}
         aria-label="Home workbench"
         onClick={() => onSelectTab(null)}
-        className={`flex items-center gap-2 px-3.5 py-2 rounded-t-lg text-xs sm:text-sm font-semibold transition-all shrink-0 ${
+        className={`flex items-center gap-2 px-3.5 py-2 rounded-t-lg text-xs sm:text-sm font-semibold transition-colors shrink-0 ${
           activeTabId === null
             ? isLight
               ? 'bg-white text-sky-700 border-t-2 border-sky-600 shadow-xs'
@@ -89,7 +89,7 @@ export const TabBar: React.FC<TabBarProps> = ({
                 onCloseTab(tab.fileId);
               }
             }}
-            className={`group relative flex items-center gap-2 px-3.5 py-2 rounded-t-lg text-xs sm:text-sm font-medium cursor-pointer transition-all border-r max-w-[260px] shrink-0 ${
+            className={`group relative flex items-center gap-2 px-3.5 py-2 rounded-t-lg text-xs sm:text-sm font-medium cursor-pointer transition-colors border-r max-w-[260px] shrink-0 ${
               isLight ? 'border-slate-300' : 'border-slate-800'
             } ${
               isActive

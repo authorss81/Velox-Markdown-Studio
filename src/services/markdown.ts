@@ -35,15 +35,16 @@ markedInstance.use({
       }
 
       return `
-        <figure class="my-5 flex flex-col items-center">
+        <figure class="my-4 flex flex-col items-center">
           <div class="relative group max-w-full overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/50 shadow-lg cursor-zoom-in transition-all duration-200 hover:border-sky-500/50">
             <img src="${safeHref}" ${altAttr}${titleAttr} class="max-w-full h-auto object-contain max-h-[500px] transition-transform duration-300 group-hover:scale-[1.01]" data-zoomable="true" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
             <div class="absolute inset-0 bg-sky-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
               <span class="bg-slate-950/80 text-sky-300 text-xs px-2.5 py-1 rounded-full border border-sky-500/30 flex items-center gap-1 shadow-md">
-                🔍 Click to zoom
+                Click to zoom
               </span>
             </div>
           </div>
+          <div class="md-img-fallback" role="img" aria-label="${escapeHtml(text || 'Markdown Image')}">Image unavailable</div>
           ${caption}
         </figure>
       `;
@@ -94,6 +95,13 @@ markedInstance.use({
         inner = '';
       }
       return `<blockquote class="border-l-4 border-sky-600 bg-sky-950/20 px-4 py-2.5 my-3 rounded-r-lg text-slate-300 italic [&>p]:m-0">${inner}</blockquote>`;
+    },
+    checkbox({ checked }) {
+      // marked's default emits disabled="", which makes the preview's toggle
+      // handler unreachable. data-task marks exactly the checkboxes this parser
+      // produced, so the toggle can ignore lookalikes (raw HTML inputs, or
+      // "- [ ]" text sitting inside a fenced code block).
+      return `<input type="checkbox" data-task${checked ? ' checked=""' : ''}>`;
     },
   },
 });

@@ -13,6 +13,11 @@
 @theme {
   --text-2xs: 0.6875rem;
 
+  /* Chrome and document share one sans stack. Both previously landed on Segoe
+     UI on Windows through different lists, which would have diverged on any
+     other platform. */
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+
   /* One monospace stack for the whole app. The editor, the preview's code and
      Tailwind's font-mono previously resolved to three different faces on
      Windows (Cascadia vs Consolas); now they cannot diverge. */
@@ -48,10 +53,12 @@
     /* Shared preview chrome values. These are theme-independent and currently
        identical everywhere they are used. */
     --velox-md-image-radius: 0.6rem;
-    --velox-md-image-margin: 1.4rem auto;
+    --velox-md-image-margin: 0 auto;
     --velox-md-image-border: 1px solid rgba(148, 163, 184, 0.25);
     --velox-md-image-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-    --velox-md-image-hover-shadow: 0 10px 32px rgba(0, 120, 212, 0.3);
+    /* Neutral lift rather than a blue glow: the zoom affordance already has its
+       own overlay chip, so the glow was decoration competing with it. */
+    --velox-md-image-hover-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
 
     /* Muted metadata text (secondary labels, counts, footers). In light mode this
        is slate-500, so existing light rendering is pixel-identical; in dark mode
@@ -124,7 +131,7 @@
    Markdown Typography & Formatting Engine
    ======================================================== */
 .markdown-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   /* Scales with the zoom control via --preview-fs (set inline on the scroll
      container, default 16px). 16 * 1.05 reproduces the previous 1.05rem exactly,
      and every descendant below sizes in em so the whole document zooms as one. */
@@ -470,6 +477,30 @@ html.light .markdown-body hr {
   box-shadow: var(--velox-md-image-hover-shadow);
 }
 
+/* Shown in place of an image whose URL fails to load, instead of the browser's
+   broken-image glyph inside a bordered frame. Toggled by a delegated error
+   listener; no inline handlers, which the CSP would block. */
+.markdown-body .md-img-fallback {
+  display: none;
+}
+
+.markdown-body figure.md-img-broken img,
+.markdown-body figure.md-img-broken .group {
+  display: none;
+}
+
+.markdown-body figure.md-img-broken .md-img-fallback {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  padding: 1.5rem 2rem;
+  border: 1px dashed var(--velox-md-table-border);
+  border-radius: var(--velox-md-image-radius);
+  color: var(--velox-md-quote-text);
+  font-size: 0.85em;
+}
+
 .markdown-body blockquote {
   padding: 1rem 1.4rem;
   border-radius: 0 0.6rem 0.6rem 0;
@@ -523,6 +554,35 @@ html.light .markdown-body hr {
   line-height: 1.6;
   display: block;
   padding: 1.25rem;
+}
+
+/* "Copied" feedback for code-block copy buttons. Attribute-driven rather than
+   textContent mutation, which React would clobber on the next render. */
+.markdown-body .copy-code-btn[data-copied="true"] {
+  color: #34d399;
+}
+
+.markdown-body .copy-code-btn[data-copied="true"] span {
+  visibility: hidden;
+  position: relative;
+}
+
+.markdown-body .copy-code-btn[data-copied="true"] span::after {
+  content: "Copied!";
+  visibility: visible;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Gutter rows skip rendering cost when far off-screen. A long document mounts
+   one node per line with no virtualizer; this keeps the DOM while letting the
+   browser skip paint and layout for rows outside the viewport. */
+.velox-gutter-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 24px;
 }
 
 /* Interactive Checkboxes */

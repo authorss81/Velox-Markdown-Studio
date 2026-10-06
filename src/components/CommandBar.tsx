@@ -4,6 +4,7 @@ import {
   FolderOpen,
   Save,
   FileDown,
+  Share2,
   Eye,
   Code,
   Columns2,
@@ -15,6 +16,7 @@ import {
   List,
   CheckSquare,
   Quote,
+  SquareCode,
   Table as TableIcon,
   Image as ImageIcon,
   Link as LinkIcon,
@@ -272,9 +274,9 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onInsertMarkdown('`', '`', 'code')}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-300'}`}
               title="Inline Code"
- aria-label=""
+              aria-label="Inline Code"
             >
-              <Code className="w-4 h-4" />
+              <SquareCode className="w-4 h-4" />
             </button>
             <button
               onClick={() => onInsertMarkdown('- [ ] ', '', 'Task item')}
@@ -380,7 +382,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Export Document (Download Markdown, HTML, PDF, or copy to clipboard)"
  aria-label=""
             >
-              <FileDown className="w-4 h-4 text-purple-500" />
+              <Share2 className="w-4 h-4 text-purple-500" />
               <span className="hidden sm:inline">Export</span>
             </button>
           </div>
