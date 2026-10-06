@@ -74,6 +74,49 @@ export default function App() {
   const isScrollingLock = useRef<'editor' | 'preview' | null>(null);
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
 
+  // Split-view ratio (fraction of the width owned by the editor). The split used
+  // to be a hard-coded 50/50 with no handle at all.
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const splitBoxRef = useRef<HTMLDivElement>(null);
+  const draggingSplit = useRef(false);
+
+  const clampSplitRatio = useCallback(
+    (value: number) => Math.min(0.75, Math.max(0.25, value)),
+    []
+  );
+
+  const handleSplitPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    draggingSplit.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, []);
+
+  const handleSplitPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!draggingSplit.current) return;
+      const box = splitBoxRef.current?.getBoundingClientRect();
+      if (!box || box.width === 0) return;
+      setSplitRatio(clampSplitRatio((e.clientX - box.left) / box.width));
+    },
+    [clampSplitRatio]
+  );
+
+  const endSplitDrag = useCallback(() => {
+    draggingSplit.current = false;
+  }, []);
+
+  const handleSplitKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setSplitRatio((prev) => clampSplitRatio(prev - 0.02));
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setSplitRatio((prev) => clampSplitRatio(prev + 0.02));
+      }
+    },
+    [clampSplitRatio]
+  );
+
   // Modals
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showSampleLibrary, setShowSampleLibrary] = useState(false);
@@ -996,13 +1039,13 @@ export default function App() {
           showToast(`Word wrap ${next ? 'on' : 'off'}`);
         }}
         onZoomIn={() => {
-          const next = Math.min(fontSize + 2, 32);
+          const next = Math.min(fontSize + 1, 26);
           setFontSize(next);
           persistViewPrefs({ fontSize: next });
           showToast(`Zoom: ${next}px`);
         }}
         onZoomOut={() => {
-          const next = Math.max(fontSize - 2, 11);
+          const next = Math.max(fontSize - 1, 13);
           setFontSize(next);
           persistViewPrefs({ fontSize: next });
           showToast(`Zoom: ${next}px`);
@@ -1079,8 +1122,8 @@ export default function App() {
 
             {/* View Mode: Split (Raw + Preview side-by-side with synchronized scrolling) */}
             {activeTab.viewMode === 'split' && (
-              <div className={`h-full w-full flex divide-x ${isLight ? 'divide-slate-200' : 'divide-slate-800'}`}>
-                <div className="w-1/2 h-full">
+              <div ref={splitBoxRef} className="h-full w-full flex">
+                <div className="h-full shrink-0 overflow-hidden" style={{ width: `${splitRatio * 100}%` }}>
                   <RawEditor
                     ref={editorRef}
                     content={activeTab.content}
@@ -1094,7 +1137,26 @@ export default function App() {
                     onCursorChange={(line, col) => setCursorPos({ line, col })}
                   />
                 </div>
-                <div className={`w-1/2 h-full ${isLight ? 'bg-white' : 'bg-slate-950'}`}>
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize editor and preview"
+                  aria-valuenow={Math.round(splitRatio * 100)}
+                  aria-valuemin={25}
+                  aria-valuemax={75}
+                  tabIndex={0}
+                  onPointerDown={handleSplitPointerDown}
+                  onPointerMove={handleSplitPointerMove}
+                  onPointerUp={endSplitDrag}
+                  onPointerCancel={endSplitDrag}
+                  onKeyDown={handleSplitKeyDown}
+                  className={`group relative w-1 shrink-0 cursor-col-resize transition-colors hover:bg-sky-500/60 focus-visible:bg-sky-500 ${
+                    isLight ? 'bg-slate-200' : 'bg-slate-800'
+                  }`}
+                >
+                  <span className="absolute inset-y-0 -left-1 -right-1" aria-hidden="true" />
+                </div>
+                <div className={`h-full flex-1 min-w-0 ${isLight ? 'bg-white' : 'bg-slate-950'}`}>
                   <ErrorBoundary
                     label="Preview"
                     fallback={(_error, reset) => (

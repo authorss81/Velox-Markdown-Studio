@@ -23,7 +23,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   const isLight = theme === 'light';
 
   return (
-    <footer className={`h-8 border-t px-3.5 flex items-center justify-between text-xs select-none z-40 transition-colors duration-150 ${
+    <footer className={`h-8 border-t px-4 flex items-center justify-between text-xs select-none z-40 transition-colors duration-150 ${
       isLight ? 'bg-white border-slate-200 text-slate-700 shadow-2xs' : 'bg-slate-900 border-slate-800 text-slate-400'
     }`}>
       {/* Left side: Status & File Info */}
@@ -51,7 +51,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
             <div className={`h-3.5 w-px hidden sm:block ${isLight ? 'bg-slate-300' : 'bg-slate-700/80'}`} />
 
-            <div className={`truncate max-w-[320px] hidden md:block font-mono text-[11px] ${
+            <div className={`truncate max-w-[320px] hidden md:block font-mono text-2xs ${
               isLight ? 'text-slate-500' : 'text-slate-400'
             }`}>
               {activeTab.path || activeTab.name}

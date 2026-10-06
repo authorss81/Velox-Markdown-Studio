@@ -57,7 +57,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         <p className="max-w-md text-xs text-slate-400">
           Your document is untouched. You can retry, or switch view to keep working.
         </p>
-        <pre className="max-w-full overflow-x-auto whitespace-pre-wrap rounded border border-slate-700 bg-slate-900/60 p-2 text-left text-[11px] text-slate-400">
+        <pre className="max-w-full overflow-x-auto whitespace-pre-wrap rounded border border-slate-700 bg-slate-900/60 p-2 text-left text-2xs text-slate-400">
           {error.message}
         </pre>
         <button

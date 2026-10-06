@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, FileDown, Code, Copy, Check, Printer, FileText } from 'lucide-react';
 import { downloadTextFile, generateStandaloneHtml } from '../services/export';
 import { parseMarkdown } from '../services/markdown';
+import { useModalFocus } from '../hooks/useModalFocus';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -31,6 +32,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     if (!isOpen) return '';
     return generateStandaloneHtml(fileName, parseMarkdown(markdownContent));
   }, [isOpen, fileName, markdownContent]);
+
+  const dialogRef = useModalFocus<HTMLDivElement>(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -64,6 +67,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in select-none"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Export document"
         onClick={(e) => e.stopPropagation()}
         className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] transition-colors duration-150 ${
           isLight
@@ -86,7 +94,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <div>
               <h2 className={`text-base font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 <span>Export Document</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${
+                <span className={`text-2xs px-2 py-0.5 rounded-full font-mono border ${
                   isLight
                     ? 'bg-slate-200 text-slate-700 border-slate-300'
                     : 'bg-slate-800 text-slate-400 border-slate-700'
@@ -104,6 +112,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             className={`p-1.5 rounded-lg transition ${
               isLight ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
+          aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
           </button>
@@ -120,7 +129,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <FileText className="w-4 h-4" />
                 <span>Markdown (.md)</span>
               </div>
-              <p className="text-[11px] text-[var(--velox-muted)] mt-1">Raw GFM source file</p>
+              <p className="text-2xs text-[var(--velox-muted)] mt-1">Raw GFM source file</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -134,7 +143,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 className={`p-1.5 rounded-lg border transition ${
                   isLight ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
                 }`}
-                title="Copy Markdown to clipboard"
+                title="Copy Markdown to clipboard" aria-label="Copy Markdown to clipboard"
               >
                 {copiedType === 'md' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
@@ -150,7 +159,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <Code className="w-4 h-4" />
                 <span>Web HTML (.html)</span>
               </div>
-              <p className="text-[11px] text-[var(--velox-muted)] mt-1">Self-contained styled page</p>
+              <p className="text-2xs text-[var(--velox-muted)] mt-1">Self-contained styled page</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -164,7 +173,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 className={`p-1.5 rounded-lg border transition ${
                   isLight ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
                 }`}
-                title="Copy HTML to clipboard"
+                title="Copy HTML to clipboard" aria-label="Copy HTML to clipboard"
               >
                 {copiedType === 'html' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
@@ -180,7 +189,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <Printer className="w-4 h-4" />
                 <span>Print to PDF</span>
               </div>
-              <p className="text-[11px] text-[var(--velox-muted)] mt-1">Browser PDF print dialog</p>
+              <p className="text-2xs text-[var(--velox-muted)] mt-1">Browser PDF print dialog</p>
             </div>
             <button
               onClick={() => {

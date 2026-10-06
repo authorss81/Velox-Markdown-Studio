@@ -48,7 +48,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         paddingRight: isDesktop ? 'var(--velox-caption-reserve, 140px)' : undefined,
         height: 'var(--velox-titlebar-height, 42px)',
       }}
-      className={`select-none backdrop-blur-md border-b flex items-center justify-between pl-3.5 pr-3 z-50 text-xs sm:text-sm transition-colors duration-150 [-webkit-app-region:drag] ${
+      className={`select-none backdrop-blur-md border-b flex items-center justify-between pl-4 pr-4 z-50 text-xs sm:text-sm transition-colors duration-150 [-webkit-app-region:drag] ${
         isLight
           ? 'bg-white/95 border-slate-200 text-slate-800 shadow-2xs'
           : 'bg-slate-900/95 border-slate-800 text-slate-300'
@@ -57,7 +57,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       {/* Left: App Branding & File Title */}
       <div className="flex items-center gap-3 overflow-hidden [-webkit-app-region:no-drag]">
         <div className="flex items-center gap-2 font-semibold tracking-wide flex-shrink-0">
-          <AppLogo size={22} className="w-5.5 h-5.5" />
+          <AppLogo size={22} className="w-6 h-6" />
           <span className={`text-sm font-bold hidden sm:inline ${isLight ? 'text-slate-900' : 'text-white'}`}>
             VeloxMD
           </span>
@@ -89,7 +89,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       <div className="flex-1 max-w-md mx-4 hidden md:block [-webkit-app-region:no-drag]">
         <button
           onClick={onOpenSearch}
-          className={`w-full h-7.5 px-3 rounded-lg border flex items-center justify-between transition-colors shadow-2xs text-xs sm:text-sm ${
+          className={`w-full h-7 px-3 rounded-lg border flex items-center justify-between transition-colors shadow-2xs text-xs sm:text-sm ${
             isLight
               ? 'bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-600 hover:text-slate-900'
               : 'bg-slate-800/90 hover:bg-slate-700/80 border-slate-700/80 text-slate-400 hover:text-slate-200'
@@ -99,7 +99,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             <Search className="w-4 h-4 text-slate-400" />
             <span className="truncate">Search MD files, contents or commands...</span>
           </div>
-          <kbd className={`text-[11px] px-2 py-0.5 rounded font-mono font-medium border ${
+          <kbd className={`text-2xs px-2 py-0.5 rounded font-mono font-medium border ${
             isLight
               ? 'bg-white text-slate-700 border-slate-300'
               : 'bg-slate-900 text-slate-400 border-slate-700'
@@ -118,7 +118,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           className={`md:hidden p-2 rounded-lg transition ${
             isLight ? 'hover:bg-slate-200 text-slate-700' : 'hover:bg-slate-800 text-slate-400'
           }`}
-          title="Search (Ctrl+K)"
+          title="Search (Ctrl+K)" aria-label="Search"
         >
           <Search className="w-4 h-4" />
         </button>

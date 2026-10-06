@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, ZoomIn, ZoomOut, Copy, Check } from 'lucide-react';
+import { useModalFocus } from '../hooks/useModalFocus';
 
 interface ImageLightboxModalProps {
   imageSrc: string | null;
@@ -19,6 +20,10 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
     setScale(1);
   }, [imageSrc]);
 
+  // The lightbox is driven by imageSrc rather than isOpen, so it is open
+  // whenever a source is set.
+  const dialogRef = useModalFocus<HTMLDivElement>(imageSrc !== null, onClose);
+
   if (!imageSrc) return null;
 
   const handleCopyUrl = () => {
@@ -33,6 +38,11 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={imageAlt ? `Image viewer: ${imageAlt}` : 'Image viewer'}
         onClick={(e) => e.stopPropagation()}
         className="relative max-w-5xl max-h-[90vh] flex flex-col items-center justify-center bg-slate-900/90 border border-slate-700/80 rounded-2xl overflow-hidden shadow-2xl"
       >
@@ -46,17 +56,17 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             <button
               onClick={() => setScale((s) => Math.min(s + 0.25, 3))}
               className="p-1.5 rounded hover:bg-slate-800 text-slate-300"
-              title="Zoom in"
+              title="Zoom in" aria-label="Zoom in"
             >
               <ZoomIn className="w-4 h-4" />
             </button>
-            <span className="text-[11px] font-mono text-slate-400 min-w-[40px] text-center">
+            <span className="text-2xs font-mono text-slate-400 min-w-[40px] text-center">
               {Math.round(scale * 100)}%
             </span>
             <button
               onClick={() => setScale((s) => Math.max(s - 0.25, 0.5))}
               className="p-1.5 rounded hover:bg-slate-800 text-slate-300"
-              title="Zoom out"
+              title="Zoom out" aria-label="Zoom out"
             >
               <ZoomOut className="w-4 h-4" />
             </button>
@@ -66,7 +76,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             <button
               onClick={handleCopyUrl}
               className="p-1.5 rounded hover:bg-slate-800 text-slate-300 flex items-center gap-1"
-              title="Copy image link"
+              title="Copy image link" aria-label="Copy image link"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             </button>
@@ -74,7 +84,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             <button
               onClick={onClose}
               className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
-              title="Close viewer"
+              title="Close viewer" aria-label="Close viewer"
             >
               <X className="w-4 h-4" />
             </button>

@@ -17,6 +17,7 @@ import {
 import { MarkdownFileRecord, ViewMode } from '../types';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { filterFilesByQuery } from '../services/search';
+import { useModalFocus } from '../hooks/useModalFocus';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -183,6 +184,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     // read through `actions` precisely so they stay out of this list.
   }, [debouncedQuery, recentFiles]);
 
+  // The dialog owns Escape now (focus trap hook below); arrows/Enter stay here.
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -196,11 +198,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         items[selectedIndex].action();
         onClose();
       }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
     }
   };
+
+  const dialogRef = useModalFocus<HTMLDivElement>(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -210,6 +211,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70 backdrop-blur-sm animate-in fade-in select-none"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         onClick={(e) => e.stopPropagation()}
         className={`w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-100 ${
           isLight
@@ -218,7 +224,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         }`}
       >
         {/* Search Input */}
-        <div className={`flex items-center gap-3 px-4.5 py-3.5 border-b ${
+        <div className={`flex items-center gap-3 px-4 py-3 border-b ${
           isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
         }`}>
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
@@ -236,7 +242,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             }`}
             autoFocus
           />
-          <kbd className={`text-[10px] px-2 py-0.5 rounded border font-mono ${
+          <kbd className={`text-2xs px-2 py-0.5 rounded border font-mono ${
             isLight ? 'bg-white text-slate-600 border-slate-300' : 'bg-slate-800 text-slate-400 border-slate-700'
           }`}>
             ESC
@@ -244,7 +250,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         </div>
 
         {/* Results List */}
-        <div className="max-h-84 overflow-y-auto p-2 space-y-1">
+        <div role="listbox" aria-label="Commands and files" className="max-h-84 overflow-y-auto p-2 space-y-1">
           {items.length === 0 ? (
             <div className="p-8 text-center text-xs text-[var(--velox-muted)]">
               No matching commands or files found
@@ -253,6 +259,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             items.map((item, idx) => (
               <div
                 key={item.id}
+                role="option"
+                aria-selected={selectedIndex === idx}
                 onClick={() => {
                   item.action();
                   onClose();
@@ -271,7 +279,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                 <div className="shrink-0">{item.icon}</div>
                 <div className="flex-1 overflow-hidden">
                   <div className="text-xs sm:text-sm font-semibold truncate">{item.title}</div>
-                  <div className={`text-[11px] truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <div className={`text-2xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     {item.subtitle}
                   </div>
                 </div>
@@ -281,7 +289,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`px-4.5 py-2.5 border-t flex items-center justify-between text-[11px] ${
+        <div className={`px-4 py-2.5 border-t flex items-center justify-between text-2xs ${
           isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950/80 border-slate-800 text-[var(--velox-muted)]'
         }`}>
           <div className="flex items-center gap-3">

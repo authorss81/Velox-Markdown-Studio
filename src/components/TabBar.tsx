@@ -22,11 +22,30 @@ export const TabBar: React.FC<TabBarProps> = ({
   const isLight = theme === 'light';
 
   return (
-    <div className={`h-[42px] border-b flex items-center px-2.5 gap-1.5 overflow-x-auto select-none no-scrollbar transition-colors duration-150 ${
-      isLight ? 'bg-slate-200/90 border-slate-300' : 'bg-slate-950 border-slate-800'
-    }`}>
+    <div
+      role="tablist"
+      aria-label="Open documents"
+      onKeyDown={(e) => {
+        // Roving focus across tabs; arrows also select, matching click.
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        const items = Array.from(
+          e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')
+        );
+        const at = items.indexOf(document.activeElement as HTMLElement);
+        if (at === -1) return;
+        e.preventDefault();
+        const next = items[(at + (e.key === 'ArrowRight' ? 1 : -1) + items.length) % items.length];
+        next?.focus();
+        next?.click();
+      }}
+      className={`h-[42px] border-b flex items-center px-4 gap-1.5 overflow-x-auto select-none no-scrollbar transition-colors duration-150 ${
+        isLight ? 'bg-slate-200/90 border-slate-300' : 'bg-slate-950 border-slate-800'
+      }`}>
       {/* Home tab */}
       <button
+        role="tab"
+        aria-selected={activeTabId === null}
+        aria-label="Home workbench"
         onClick={() => onSelectTab(null)}
         className={`flex items-center gap-2 px-3.5 py-2 rounded-t-lg text-xs sm:text-sm font-semibold transition-all shrink-0 ${
           activeTabId === null
@@ -49,7 +68,20 @@ export const TabBar: React.FC<TabBarProps> = ({
         return (
           <div
             key={tab.fileId}
+            role="tab"
+            aria-selected={isActive}
+            aria-label={`${tab.name}${tab.isDirty ? ', unsaved changes' : ''}`}
+            tabIndex={isActive ? 0 : -1}
             onClick={() => onSelectTab(tab.fileId)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelectTab(tab.fileId);
+              } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                onCloseTab(tab.fileId);
+              }
+            }}
             onAuxClick={(e) => {
               if (e.button === 1) {
                 e.preventDefault();
@@ -93,12 +125,13 @@ export const TabBar: React.FC<TabBarProps> = ({
                 e.preventDefault();
                 onCloseTab(tab.fileId);
               }}
-              className={`w-5.5 h-5.5 flex items-center justify-center rounded-md transition shrink-0 ml-1 ${
+              className={`w-6 h-6 flex items-center justify-center rounded-md transition shrink-0 ml-1 ${
                 isLight
                   ? 'hover:bg-slate-200 text-slate-500 hover:text-slate-900'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
               }`}
               title="Close tab (Ctrl+W)"
+              aria-label={`Close ${tab.name}`}
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -115,6 +148,7 @@ export const TabBar: React.FC<TabBarProps> = ({
             : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
         }`}
         title="New Document (Ctrl+N)"
+        aria-label="New document"
       >
         <Plus className="w-4 h-4" />
       </button>

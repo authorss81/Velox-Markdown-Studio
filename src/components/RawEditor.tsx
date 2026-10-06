@@ -280,34 +280,34 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
               }`}
               autoFocus
             />
-            <span className="text-[11px] text-slate-400 font-sans min-w-[55px] text-center">
+            <span className="text-2xs text-slate-400 font-sans min-w-[55px] text-center">
               {searchResults.length > 0 ? `${currentMatchIndex + 1}/${searchResults.length}` : '0 results'}
             </span>
             <button
               onClick={goToPrevMatch}
               className={`p-1 rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-600' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Previous match"
+              title="Previous match" aria-label="Previous match"
             >
               <ArrowUp className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={goToNextMatch}
               className={`p-1 rounded transition ${isLight ? 'hover:bg-slate-100 text-slate-600' : 'hover:bg-slate-800 text-slate-300'}`}
-              title="Next match"
+              title="Next match" aria-label="Next match"
             >
               <ArrowDown className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setShowReplace(!showReplace)}
               className={`p-1 rounded transition ${showReplace ? 'text-sky-500 font-bold' : isLight ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800'}`}
-              title="Toggle Replace"
+              title="Toggle Replace" aria-label="Toggle replace"
             >
               <Replace className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setShowSearch(false)}
               className={`p-1 rounded transition ${isLight ? 'text-slate-400 hover:text-slate-800' : 'text-slate-400 hover:text-white'}`}
-              title="Close find"
+              title="Close find" aria-label="Close find"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -329,14 +329,14 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
               <button
                 onClick={handleReplaceCurrent}
                 disabled={searchResults.length === 0}
-                className="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 disabled:opacity-40 text-white font-medium text-[11px]"
+                className="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 disabled:opacity-40 text-white font-medium text-2xs"
               >
                 Replace
               </button>
               <button
                 onClick={handleReplaceAll}
                 disabled={searchResults.length === 0}
-                className={`px-2 py-1 rounded font-medium text-[11px] border ${
+                className={`px-2 py-1 rounded font-medium text-2xs border ${
                   isLight ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
                 }`}
               >

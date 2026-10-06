@@ -7,6 +7,13 @@
    `dark:`-prefixed elements rendered its light-mode colour. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* The smallest legible size: 11px. The codebase used text-[10px] and text-[11px]
+   in 31 places to squeeze text into containers; 10px is below every legibility
+   threshold, so both map here. */
+@theme {
+  --text-2xs: 0.6875rem;
+}
+
 @layer base {
   /* One visible focus indicator for the whole app. Keyboard users tabbing through
      the toolbar, tab strip or dialogs previously had no way to see where they
@@ -457,13 +464,17 @@ html.light .markdown-body hr {
   font-size: 1em;
 }
 
-/* Tables */
+/* Tables. display:block with overflow-x lets a wide table scroll inside the pane
+   instead of overflowing it with no affordance; the radius survives because the
+   block clips its own box. */
 .markdown-body table {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   margin: 1.4rem 0;
   border-radius: 0.6rem;
-  overflow: hidden;
   font-size: 0.93em;
 }
 

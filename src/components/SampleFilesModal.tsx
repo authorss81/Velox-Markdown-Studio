@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Sparkles, FileText, ArrowRight } from 'lucide-react';
 import { SAMPLE_FILES } from '../data/samples';
+import { useModalFocus } from '../hooks/useModalFocus';
 
 interface SampleFilesModalProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ export const SampleFilesModal: React.FC<SampleFilesModalProps> = ({
   onClose,
   onSelectSample,
 }) => {
+  const dialogRef = useModalFocus<HTMLDivElement>(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
@@ -21,6 +24,11 @@ export const SampleFilesModal: React.FC<SampleFilesModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in select-none"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sample Markdown library"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
       >
@@ -39,6 +47,7 @@ export const SampleFilesModal: React.FC<SampleFilesModalProps> = ({
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+          aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
           </button>
@@ -64,12 +73,12 @@ export const SampleFilesModal: React.FC<SampleFilesModalProps> = ({
                 <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
                   {sample.content.replace(/^#+\s+/gm, '').substring(0, 120)}...
                 </p>
-                <div className="flex items-center gap-2 pt-1 text-[11px] text-[var(--velox-muted)]">
+                <div className="flex items-center gap-2 pt-1 text-2xs text-[var(--velox-muted)]">
                   <span>{sample.wordCount} words</span>
                   <span>•</span>
                   <span>{sample.readingTimeMinutes} min read</span>
                   {sample.tags.map((t) => (
-                    <span key={t} className="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[10px]">
+                    <span key={t} className="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-2xs">
                       {t}
                     </span>
                   ))}

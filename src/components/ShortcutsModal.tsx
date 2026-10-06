@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Keyboard, Search } from 'lucide-react';
+import { useModalFocus } from '../hooks/useModalFocus';
 
 interface ShortcutsModalProps {
   isOpen: boolean;
@@ -95,6 +96,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
 }) => {
   const [filter, setFilter] = useState('');
   const isLight = theme === 'light';
+  const dialogRef = useModalFocus<HTMLDivElement>(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -113,6 +115,11 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in select-none"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Keyboard shortcuts reference"
         onClick={(e) => e.stopPropagation()}
         className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] transition-colors duration-150 ${
           isLight
@@ -135,7 +142,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
             <div>
               <h2 className={`text-base font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 <span>Keyboard Shortcuts Reference</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${
+                <span className={`text-2xs px-2 py-0.5 rounded-full font-mono border ${
                   isLight
                     ? 'bg-slate-200 text-slate-700 border-slate-300'
                     : 'bg-slate-800 text-slate-400 border-slate-700'
@@ -153,6 +160,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
             className={`p-1.5 rounded-lg transition ${
               isLight ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
+          aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
           </button>
@@ -217,7 +225,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
                         <div className="flex items-center gap-1.5 shrink-0">
                           {item.keys.map((k, kIdx) => (
                             <React.Fragment key={kIdx}>
-                              <kbd className={`px-2 py-1 rounded-md text-[11px] font-mono font-semibold shadow-sm border ${
+                              <kbd className={`px-2 py-1 rounded-md text-2xs font-mono font-semibold shadow-sm border ${
                                 isLight
                                   ? 'bg-white text-slate-800 border-slate-300 shadow-slate-200'
                                   : 'bg-slate-800 text-slate-200 border-slate-700 shadow-black/40'
