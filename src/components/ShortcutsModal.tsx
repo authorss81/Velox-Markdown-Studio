@@ -186,7 +186,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
         {/* Shortcuts List by Category */}
         <div className="p-6 overflow-y-auto space-y-6">
           {categories.length === 0 ? (
-            <div className="text-center py-8 text-xs text-slate-500">
+            <div className="text-center py-8 text-xs text-[var(--velox-muted)]">
               No shortcuts found matching "{filter}"
             </div>
           ) : (
@@ -240,7 +240,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
 
         {/* Footer */}
         <div className={`p-4 border-t flex items-center justify-between text-xs ${
-          isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950/80 border-slate-800 text-slate-500'
+          isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950/80 border-slate-800 text-[var(--velox-muted)]'
         }`}>
           <span>Tip: Press ESC anytime to close</span>
           <button

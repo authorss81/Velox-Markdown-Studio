@@ -107,7 +107,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={onSave}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition font-medium ${
                 isDirty
-                  ? 'bg-sky-600 hover:bg-sky-500 text-white shadow-xs'
+                  ? 'bg-sky-700 hover:bg-sky-600 text-white shadow-xs'
                   : isLight
                   ? 'hover:bg-slate-100 text-slate-700'
                   : 'hover:bg-slate-800 text-slate-300'
@@ -149,7 +149,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onChangeViewMode('preview')}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition text-xs ${
                 viewMode === 'preview'
-                  ? 'bg-sky-600 text-white font-semibold shadow-xs'
+                  ? 'bg-sky-700 text-white font-semibold shadow-xs'
                   : isLight
                   ? 'text-slate-600 hover:text-slate-900'
                   : 'text-slate-400 hover:text-slate-200'
@@ -164,7 +164,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onChangeViewMode('raw')}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition text-xs ${
                 viewMode === 'raw'
-                  ? 'bg-sky-600 text-white font-semibold shadow-xs'
+                  ? 'bg-sky-700 text-white font-semibold shadow-xs'
                   : isLight
                   ? 'text-slate-600 hover:text-slate-900'
                   : 'text-slate-400 hover:text-slate-200'
@@ -179,7 +179,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onChangeViewMode('split')}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition text-xs ${
                 viewMode === 'split'
-                  ? 'bg-sky-600 text-white font-semibold shadow-xs'
+                  ? 'bg-sky-700 text-white font-semibold shadow-xs'
                   : isLight
                   ? 'text-slate-600 hover:text-slate-900'
                   : 'text-slate-400 hover:text-slate-200'

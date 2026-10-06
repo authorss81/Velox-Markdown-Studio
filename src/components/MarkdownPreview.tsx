@@ -150,7 +150,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
   if (!content.trim()) {
     return (
       <div className={`h-full flex flex-col items-center justify-center p-8 select-none ${
-        theme === 'light' ? 'text-slate-400' : 'text-slate-500'
+        theme === 'light' ? 'text-slate-500' : 'text-slate-400'
       }`}>
         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-3 ${
           theme === 'light' ? 'bg-slate-100 border border-slate-200 text-sky-600' : 'bg-slate-900 border border-slate-800 text-sky-400'
@@ -160,7 +160,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
         <p className={`text-sm font-medium ${theme === 'light' ? 'text-slate-700' : 'text-slate-300'}`}>
           Empty Document
         </p>
-        <p className={`text-xs mt-1 ${theme === 'light' ? 'text-slate-500' : 'text-slate-500'}`}>
+        <p className="text-xs mt-1 text-[var(--velox-muted)]">
           Switch to Raw view or Split view to start writing Markdown.
         </p>
       </div>

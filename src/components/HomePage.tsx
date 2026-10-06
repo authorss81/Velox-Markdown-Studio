@@ -117,7 +117,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={onOpenLocalFile}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs shadow-md shadow-sky-900/30 transition hover:scale-[1.02]"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white font-medium text-xs shadow-md shadow-sky-900/30 transition hover:scale-[1.02]"
               title="Open any .md file directly from Windows File Explorer (Ctrl+O)"
             >
               <FolderOpen className="w-4 h-4" />
@@ -199,7 +199,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Search Results with Context Snippets */}
           {hasQuery && (
             <div className="space-y-4 pt-2 animate-in fade-in">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--velox-muted)]">
                 <FileText className="w-3.5 h-3.5 text-sky-500" />
                 <span>Search Results with Context ({searchResults.length})</span>
               </div>
@@ -211,7 +211,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <p className={`text-sm font-medium ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
                     No files found containing "{searchQuery}"
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-[var(--velox-muted)] mt-1">
                     Try searching for other keywords, or open new Markdown files to index their contents.
                   </p>
                 </div>
@@ -246,7 +246,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                 {matchesCount} match{matchesCount === 1 ? '' : 'es'}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 font-mono truncate max-w-xl">
+                            <p className="text-[11px] text-[var(--velox-muted)] font-mono truncate max-w-xl">
                               {file.path}
                             </p>
                           </div>
@@ -257,7 +257,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                             e.stopPropagation();
                             onOpenFileById(file.id);
                           }}
-                          className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition shrink-0"
+                          className="px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white text-xs font-medium transition shrink-0"
                         >
                           Open Document
                         </button>
@@ -284,18 +284,18 @@ export const HomePage: React.FC<HomePageProps> = ({
                               Line {snip.lineNumber}:
                             </span>
                             <div className="flex-1 break-words">
-                              <span className="text-slate-500">{snip.prefix}</span>
+                              <span className="text-[var(--velox-muted)]">{snip.prefix}</span>
                               <mark className="bg-amber-400 text-slate-950 px-1 py-0.5 rounded font-semibold mx-0.5">
                                 {snip.match}
                               </mark>
-                              <span className="text-slate-500">{snip.suffix}</span>
+                              <span className="text-[var(--velox-muted)]">{snip.suffix}</span>
                             </div>
                           </div>
                         ))}
                       </div>
 
                       {/* File Metadata footer */}
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                      <div className="flex items-center justify-between text-[11px] text-[var(--velox-muted)] pt-1">
                         <span>{file.wordCount} words • {formatFileSize(file.size)}</span>
                         <span>Opened {formatTimestamp(file.lastOpened)}</span>
                       </div>
@@ -353,7 +353,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     {file.content.replace(/^#+\s+/gm, '').substring(0, 140)}...
                   </p>
 
-                  <div className={`flex items-center justify-between mt-4 pt-3 border-t text-[11px] text-slate-500 ${
+                  <div className={`flex items-center justify-between mt-4 pt-3 border-t text-[11px] text-[var(--velox-muted)] ${
                     isLight ? 'border-slate-100' : 'border-slate-800'
                   }`}>
                     <span className="font-mono truncate max-w-[150px]">{file.path}</span>
@@ -398,13 +398,13 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <p className={`text-sm font-medium ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
                   File History is Empty
                 </p>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                <p className="text-xs text-[var(--velox-muted)] mt-1 max-w-sm mx-auto">
                   Open a Markdown file from your Windows PC or choose from the sample library to begin tracking history.
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-3">
                   <button
                     onClick={onOpenLocalFile}
-                    className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium"
+                    className="px-4 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-xs font-medium"
                   >
                     Open Windows File
                   </button>
@@ -491,13 +491,13 @@ export const HomePage: React.FC<HomePageProps> = ({
                           </td>
 
                           {/* Size & Metrics */}
-                          <td className="py-3.5 px-3 text-[11px] text-slate-500 hidden md:table-cell">
+                          <td className="py-3.5 px-3 text-[11px] text-[var(--velox-muted)] hidden md:table-cell">
                             <div>{file.wordCount} words</div>
                             <div className="text-[10px]">{formatFileSize(file.size)}</div>
                           </td>
 
                           {/* Last Opened */}
-                          <td className="py-3.5 px-3 text-[11px] text-slate-500 hidden sm:table-cell">
+                          <td className="py-3.5 px-3 text-[11px] text-[var(--velox-muted)] hidden sm:table-cell">
                             {formatTimestamp(file.lastOpened)}
                           </td>
 
@@ -506,7 +506,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                             <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => onOpenFileById(file.id)}
-                                className="px-3 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-medium transition"
+                                className="px-3 py-1 rounded-lg bg-sky-700 hover:bg-sky-600 text-white text-[11px] font-medium transition"
                                 title="Open in viewer"
                               >
                                 Open
@@ -514,7 +514,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                               <button
                                 onClick={() => onDeleteRecord(file.id)}
                                 className={`p-1.5 rounded transition ${
-                                  isLight ? 'text-slate-400 hover:text-rose-600 hover:bg-slate-100' : 'text-slate-500 hover:text-rose-400 hover:bg-slate-800'
+                                  isLight ? 'text-slate-400 hover:text-rose-600 hover:bg-slate-100' : 'text-[var(--velox-muted)] hover:text-rose-400 hover:bg-slate-800'
                                 }`}
                                 title="Remove from history"
                               >

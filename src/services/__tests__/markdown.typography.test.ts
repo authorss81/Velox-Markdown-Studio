@@ -232,3 +232,73 @@ describe('app chrome CSS contract', () => {
     expect(css).toContain('::-webkit-scrollbar-corner');
   });
 });
+
+describe('contrast contract', () => {
+  it('defines the muted-text token per theme', () => {
+    // Light keeps slate-500 (#64748b, 4.8:1 on white) so existing light
+    // rendering is pixel-identical; dark resolves to slate-400.
+    expect(css).toContain('--velox-muted: #64748b;');
+    expect(css).toMatch(/\.dark\s*\{\s*--velox-muted:\s*#94a3b8;\s*\}/);
+  });
+
+  it('leaves no unconditional text-slate-500 in components', async () => {
+    // Every remaining occurrence must belong to a theme ternary (the light
+    // branch of a correct pair). A bare text-slate-500 on a dark surface is
+    // 3.9:1 and fails AA. Ternaries can span lines, so allow a 3-line lookbehind
+    // for the condition.
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const dir = path.join(process.cwd(), 'src', 'components');
+    const offenders: string[] = [];
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.tsx')) continue;
+      const lines = fs.readFileSync(path.join(dir, file), 'utf8').split('\n');
+      lines.forEach((line, i) => {
+        if (!/text-slate-500/.test(line)) return;
+        const context = lines.slice(Math.max(0, i - 3), i + 1).join('\n');
+        if (!/isLight|theme\s*===/.test(context)) {
+          offenders.push(`${file}:${i + 1}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('pairs white text with sky-700, never sky-600', async () => {
+    // white on sky-600 is 4.10:1; on sky-700 it is 5.9:1. Hover states
+    // (hover:bg-sky-600) and tints (bg-sky-600/20) are exempt.
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const dir = path.join(process.cwd(), 'src', 'components');
+    const offenders: string[] = [];
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.tsx')) continue;
+      const src = fs.readFileSync(path.join(dir, file), 'utf8');
+      src.split('\n').forEach((line, i) => {
+        const stripped = line.replace(/hover:bg-sky-600/g, '').replace(/bg-sky-600\/20/g, '');
+        if (/(?<![\w-:])bg-sky-600(?![\w-])/.test(stripped) && /text-white/.test(stripped)) {
+          offenders.push(`${file}:${i + 1}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('gives the gutter legible numbers and no third black', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'RawEditor.tsx'),
+      'utf8'
+    );
+    // Was 2.56:1 dark / 2.34:1 light; the one element stared at while navigating.
+    expect(src).not.toContain('bg-[#090d16]');
+    expect(src).toContain('tabular-nums');
+    // The old placeholder pair (400 on white, 600 on near-black) both failed.
+    // The new pairing is light 500 / dark 400; assert the exact lines so a
+    // future edit cannot silently swap them back.
+    expect(src).toContain('selection:text-slate-950 placeholder-slate-500');
+    expect(src).toContain('selection:text-white placeholder-slate-400');
+    expect(src).not.toContain('placeholder-slate-600');
+  });
+});

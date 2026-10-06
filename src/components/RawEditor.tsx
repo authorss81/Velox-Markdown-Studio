@@ -329,7 +329,7 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
               <button
                 onClick={handleReplaceCurrent}
                 disabled={searchResults.length === 0}
-                className="px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-medium text-[11px]"
+                className="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 disabled:opacity-40 text-white font-medium text-[11px]"
               >
                 Replace
               </button>
@@ -350,8 +350,12 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
       {/* Line Numbers Gutter */}
       <div
         ref={lineNumbersRef}
-        className={`w-12 py-4 select-none text-right pr-3 border-r overflow-hidden text-xs leading-relaxed shrink-0 transition-colors ${
-          isLight ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-[#090d16] border-slate-800/80 text-slate-600'
+        className={`w-12 py-4 select-none text-right pr-3 border-r overflow-hidden text-xs leading-relaxed shrink-0 tabular-nums transition-colors ${
+          // Line numbers were 2.56:1 (dark) and 2.34:1 (light) - the one element
+          // stared at continuously while navigating, and illegible. The dark
+          // gutter also used a third unrelated near-black (#090d16) next to the
+          // editor's #0d1117 with a 1px border between them; it now matches.
+          isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-[#0d1117] border-slate-800/80 text-slate-400'
         }`}
         style={{ fontSize: `${fontSize}px` }}
       >
@@ -375,8 +379,8 @@ export const RawEditor = forwardRef<RawEditorHandle, RawEditorProps>(({
         placeholder="Type Markdown content here..."
         className={`flex-1 h-full py-4 px-4 bg-transparent resize-none leading-relaxed transition-colors ${
           isLight
-            ? 'text-slate-900 selection:bg-sky-500/25 selection:text-slate-950 placeholder-slate-400'
-            : 'text-slate-100 selection:bg-sky-500/40 selection:text-white placeholder-slate-600'
+            ? 'text-slate-900 selection:bg-sky-500/25 selection:text-slate-950 placeholder-slate-500'
+            : 'text-slate-100 selection:bg-sky-500/40 selection:text-white placeholder-slate-400'
         } ${wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre overflow-x-auto'}`}
         style={{
           fontSize: `${fontSize}px`,

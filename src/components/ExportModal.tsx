@@ -120,12 +120,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <FileText className="w-4 h-4" />
                 <span>Markdown (.md)</span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">Raw GFM source file</p>
+              <p className="text-[11px] text-[var(--velox-muted)] mt-1">Raw GFM source file</p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleDownloadMarkdown}
-                className="flex-1 py-1.5 px-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs text-center transition shadow-xs"
+                className="flex-1 py-1.5 px-2 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-medium text-xs text-center transition shadow-xs"
               >
                 Download
               </button>
@@ -150,7 +150,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <Code className="w-4 h-4" />
                 <span>Web HTML (.html)</span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">Self-contained styled page</p>
+              <p className="text-[11px] text-[var(--velox-muted)] mt-1">Self-contained styled page</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -180,7 +180,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <Printer className="w-4 h-4" />
                 <span>Print to PDF</span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">Browser PDF print dialog</p>
+              <p className="text-[11px] text-[var(--velox-muted)] mt-1">Browser PDF print dialog</p>
             </div>
             <button
               onClick={() => {
@@ -201,7 +201,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={() => setActiveTab('markdown')}
               className={`px-3 py-1 rounded-md transition font-medium ${
                 activeTab === 'markdown'
-                  ? 'bg-sky-600 text-white'
+                  ? 'bg-sky-700 text-white'
                   : isLight ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800'
               }`}
             >
@@ -211,7 +211,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={() => setActiveTab('html')}
               className={`px-3 py-1 rounded-md transition font-medium ${
                 activeTab === 'html'
-                  ? 'bg-sky-600 text-white'
+                  ? 'bg-sky-700 text-white'
                   : isLight ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800'
               }`}
             >
@@ -251,7 +251,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
         {/* Footer */}
         <div className={`p-4 border-t flex items-center justify-between text-xs ${
-          isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950/80 border-slate-800 text-slate-500'
+          isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950/80 border-slate-800 text-[var(--velox-muted)]'
         }`}>
           <span>Exports include all document formatting, tables, and images.</span>
           <button

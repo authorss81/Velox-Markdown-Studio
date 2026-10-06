@@ -34,6 +34,12 @@
     --velox-md-image-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
     --velox-md-image-hover-shadow: 0 10px 32px rgba(0, 120, 212, 0.3);
 
+    /* Muted metadata text (secondary labels, counts, footers). In light mode this
+       is slate-500, so existing light rendering is pixel-identical; in dark mode
+       it resolves to slate-400, which is what all the previously-failing
+       unconditional text-slate-500 usages needed. */
+    --velox-muted: #64748b;
+
     /* The app header doubles as the window title bar (Electron
        titleBarStyle:'hidden'). These two tokens keep its geometry honest. */
     --velox-titlebar-height: 42px;
@@ -63,6 +69,10 @@
     :root {
       --velox-titlebar-height: env(titlebar-area-height, 42px);
     }
+  }
+
+  .dark {
+    --velox-muted: #94a3b8;
   }
 }
 

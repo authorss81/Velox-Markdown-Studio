@@ -72,7 +72,7 @@ export const TabBar: React.FC<TabBarProps> = ({
             <FileText className={`w-4 h-4 flex-shrink-0 ${
               isActive
                 ? isLight ? 'text-sky-600' : 'text-sky-400'
-                : 'text-slate-500'
+                : 'text-[var(--velox-muted)]'
             }`} />
             
             <span className="truncate">{tab.name}</span>

@@ -64,7 +64,7 @@ export const SampleFilesModal: React.FC<SampleFilesModalProps> = ({
                 <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
                   {sample.content.replace(/^#+\s+/gm, '').substring(0, 120)}...
                 </p>
-                <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-500">
+                <div className="flex items-center gap-2 pt-1 text-[11px] text-[var(--velox-muted)]">
                   <span>{sample.wordCount} words</span>
                   <span>•</span>
                   <span>{sample.readingTimeMinutes} min read</span>
@@ -76,7 +76,7 @@ export const SampleFilesModal: React.FC<SampleFilesModalProps> = ({
                 </div>
               </div>
 
-              <button className="px-3 py-1.5 rounded-lg bg-slate-800 group-hover:bg-sky-600 group-hover:text-white text-slate-300 text-xs font-medium transition flex items-center gap-1.5 shrink-0 self-center">
+              <button className="px-3 py-1.5 rounded-lg bg-slate-800 group-hover:bg-sky-700 group-hover:text-white text-slate-300 text-xs font-medium transition flex items-center gap-1.5 shrink-0 self-center">
                 <span>Load</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>

@@ -246,7 +246,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {/* Results List */}
         <div className="max-h-84 overflow-y-auto p-2 space-y-1">
           {items.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500">
+            <div className="p-8 text-center text-xs text-[var(--velox-muted)]">
               No matching commands or files found
             </div>
           ) : (
@@ -282,7 +282,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
         {/* Footer */}
         <div className={`px-4.5 py-2.5 border-t flex items-center justify-between text-[11px] ${
-          isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950/80 border-slate-800 text-slate-500'
+          isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950/80 border-slate-800 text-[var(--velox-muted)]'
         }`}>
           <div className="flex items-center gap-3">
             <span>↑↓ Navigate</span>
