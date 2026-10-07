@@ -532,6 +532,10 @@ html.light .markdown-body hr {
   font-size: 1em;
 }
 
+.markdown-body figcaption {
+  color: var(--velox-muted);
+}
+
 /* Tables. display:block with overflow-x lets a wide table scroll inside the pane
    instead of overflowing it with no affordance; the radius survives because the
    block clips its own box. */

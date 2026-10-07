@@ -15,7 +15,7 @@
       <p>Body copy with <strong>bold</strong>, <em>italic</em>, <del>struck</del>,
       <code>inline()</code> and a <a href="https://example.com">link</a>.</p>
       <h2>Heading two</h2>
-      <blockquote><p>Quoted text with <strong>emphasis</strong>.</p></blockquote>
+      <blockquote class="border-l-4 px-4 py-2.5 my-3 rounded-r-lg italic [&>p]:m-0"><p>Quoted text with <strong>emphasis</strong>.</p></blockquote>
       <h3>Heading three</h3>
       <ul>
         <li>Plain item</li>
@@ -32,9 +32,15 @@
         <thead><tr><th>A</th><th>B</th></tr></thead>
         <tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody>
       </table>
-      <figure>
-        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="pixel" data-zoomable="true" loading="lazy">
-        <figcaption>Caption text</figcaption>
+      <figure class="my-4 flex flex-col items-center">
+        <div class="relative group max-w-full overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/50 shadow-lg cursor-zoom-in transition-all duration-200 hover:border-sky-500/50">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="pixel" data-zoomable="true" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="max-w-full h-auto object-contain max-h-[500px] transition-transform duration-300 group-hover:scale-[1.01]">
+          <div class="absolute inset-0 bg-sky-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+            <span class="bg-slate-950/80 text-sky-300 text-xs px-2.5 py-1 rounded-full border border-sky-500/30 flex items-center gap-1 shadow-md">Click to zoom</span>
+          </div>
+        </div>
+        <div class="md-img-fallback" role="img" aria-label="pixel">Image unavailable</div>
+        <figcaption class="text-xs mt-2 italic text-center">Caption text</figcaption>
       </figure>
       <dl><dt>Term</dt><dd>Definition text.</dd></dl>
       <p>Footnote ref<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">1</a></sup> here.</p>

@@ -19,6 +19,7 @@ const crypto = require('node:crypto');
 const REPO = process.env.VELOX_REPO ?? path.join(__dirname, '..');
 const OUT = process.argv[2] || 'current';
 const REPORT = path.join(__dirname, 'capture-report.txt');
+const THEME = process.argv[3] || 'dark';
 
 function report(line) {
   try {
@@ -47,6 +48,12 @@ app.whenReady().then(async () => {
 
   let html = fs.readFileSync(path.join(__dirname, 'capture-fixture.html'), 'utf8');
   html = html.replace('<!--STYLES-->', cssFiles);
+  // Both themes are captured: several defects (including the light-mode
+  // invisible blockquote text) only manifest in one of them.
+  html = html.replace(
+    '<html lang="en" class="dark">',
+    `<html lang="en" class="${THEME}">`
+  );
 
   const page = path.join(REPO, '.capture-page.html');
   fs.writeFileSync(page, html, 'utf8');
@@ -63,12 +70,12 @@ app.whenReady().then(async () => {
   await new Promise((r) => setTimeout(r, 1500));
 
   const png = (await win.webContents.capturePage()).toPNG();
-  const outPath = path.join(__dirname, `capture-${OUT}.png`);
+  const outPath = path.join(__dirname, `capture-${OUT}-${THEME}.png`);
   fs.writeFileSync(outPath, png);
   const hash = crypto.createHash('sha256').update(png).digest('hex');
 
-  let verdict = `capture ${OUT}: sha256=${hash}`;
-  const basePath = path.join(__dirname, 'capture-baseline.png');
+  let verdict = `capture ${OUT} [${THEME}]: sha256=${hash}`;
+  const basePath = path.join(__dirname, `capture-baseline-${THEME}.png`);
   if (OUT !== 'baseline' && fs.existsSync(basePath)) {
     const { nativeImage } = require('electron');
     const baseImg = nativeImage.createFromBuffer(fs.readFileSync(basePath));

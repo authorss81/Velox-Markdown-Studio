@@ -25,7 +25,7 @@ markedInstance.use({
       const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
       const altAttr = text ? `alt="${escapeHtml(text)}"` : 'alt="Markdown Image"';
       const caption = text
-        ? `<figcaption class="text-xs text-slate-400 mt-2 italic text-center">${escapeHtml(text)}</figcaption>`
+        ? `<figcaption class="text-xs mt-2 italic text-center">${escapeHtml(text)}</figcaption>`
         : '';
 
       if (!safeHref) {
@@ -94,7 +94,11 @@ markedInstance.use({
       } catch {
         inner = '';
       }
-      return `<blockquote class="border-l-4 border-sky-600 bg-sky-950/20 px-4 py-2.5 my-3 rounded-r-lg text-slate-300 italic [&>p]:m-0">${inner}</blockquote>`;
+      // Structural classes only - no color or text utilities. Theme CSS owns all
+      // color: after the engine moved into @layer components, utilities beat
+      // theme rules regardless of specificity, so a text-slate-300 here rendered
+      // light-mode quotes in near-white on near-white (invisible text).
+      return `<blockquote class="border-l-4 px-4 py-2.5 my-3 rounded-r-lg italic [&>p]:m-0">${inner}</blockquote>`;
     },
     checkbox({ checked }) {
       // marked's default emits disabled="", which makes the preview's toggle

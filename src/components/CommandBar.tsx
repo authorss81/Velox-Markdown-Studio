@@ -155,7 +155,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           title="New Document (Ctrl+N)"
         >
           <FilePlus className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-          {showLabels && <span>New</span>}
+          {showLabels && <span className="text-sm">New</span>}
         </button>
 
         <button
@@ -166,7 +166,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           title="Open MD File from Windows (Ctrl+O)"
         >
           <FolderOpen className="w-4 h-4 text-amber-500" />
-          {showLabels && <span>Open</span>}
+          {showLabels && <span className="text-sm">Open</span>}
         </button>
 
         {!isHomeView && (
@@ -187,7 +187,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               }
             >
               <Save className="w-4 h-4" />
-              <span>Save</span>
+              <span className="text-sm">Save</span>
               {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
             </button>
 
@@ -199,7 +199,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Save as another file in Windows (Ctrl+Shift+S)"
             >
               <FileDown className="w-4 h-4 text-emerald-500" />
-              {showLabels && <span>Save As</span>}
+              {showLabels && <span className="text-sm">Save As</span>}
             </button>
           </>
         )}
@@ -215,7 +215,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           }`}>
             <button
               onClick={() => onChangeViewMode('preview')}
-              className={`flex items-center gap-1.5 px-2.5 h-6 rounded-md transition text-xs ${
+              className={`flex items-center gap-1.5 px-2.5 h-6 rounded-md transition text-sm ${
                 viewMode === 'preview'
                   ? 'bg-sky-700 text-white font-semibold shadow-xs'
                   : isLight
@@ -230,7 +230,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
 
             <button
               onClick={() => onChangeViewMode('raw')}
-              className={`flex items-center gap-1.5 px-2.5 h-6 rounded-md transition text-xs ${
+              className={`flex items-center gap-1.5 px-2.5 h-6 rounded-md transition text-sm ${
                 viewMode === 'raw'
                   ? 'bg-sky-700 text-white font-semibold shadow-xs'
                   : isLight
@@ -245,7 +245,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
 
             <button
               onClick={() => onChangeViewMode('split')}
-              className={`flex items-center gap-1.5 px-2.5 h-6 rounded-md transition text-xs ${
+              className={`flex items-center gap-1.5 px-2.5 h-6 rounded-md transition text-sm ${
                 viewMode === 'split'
                   ? 'bg-sky-700 text-white font-semibold shadow-xs'
                   : isLight
@@ -255,7 +255,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Split Mode: Side-by-side Raw Editor and Live Preview"
             >
               <Columns2 className="w-4 h-4" />
-              {showLabels && <span>Split</span>}
+              {showLabels && <span className="text-sm">Split</span>}
             </button>
           </div>
 
@@ -393,7 +393,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Keyboard Shortcuts Reference (Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+K)"
             >
               <Keyboard className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-              {showLabels && <span className="text-2xs">Shortcuts</span>}
+              {showLabels && <span className="text-sm">Shortcuts</span>}
             </button>
 
             {/* Export Button with original neutral styling and purple icon */}
@@ -406,7 +406,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               title="Export Document (Download Markdown, HTML, PDF, or copy to clipboard)"
             >
               <Share2 className="w-4 h-4 text-purple-500" />
-              {showLabels && <span>Export</span>}
+              {showLabels && <span className="text-sm">Export</span>}
             </button>
           </div>
         </>

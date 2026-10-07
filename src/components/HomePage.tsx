@@ -88,15 +88,17 @@ export const HomePage: React.FC<HomePageProps> = ({
         }`}>
           <div className="flex items-center gap-4">
             <div className={`p-2.5 rounded-2xl border shadow-lg ${
+              // The mark's mid-blue gradients wash out on a pale chip, so in
+              // light mode it sits on a dark tile like an app icon.
               isLight
-                ? 'bg-gradient-to-br from-sky-100 to-indigo-100 border-sky-300 shadow-sky-200/50'
+                ? 'bg-slate-900 border-slate-800'
                 : 'bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border-sky-500/30 shadow-sky-950/40'
             }`}>
               <AppLogo size={58} className="w-14 h-14" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className={`text-2xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                <h1 className={`text-3xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   Velox Markdown Studio
                 </h1>
                 <span className={`text-2xs font-semibold px-2 py-0.5 rounded-full border ${
@@ -157,7 +159,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Dedicated Full-Text Keyword Search Bar */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-2 ${
+            <label className={`text-sm font-semibold uppercase tracking-wider flex items-center gap-2 ${
               isLight ? 'text-slate-700' : 'text-slate-300'
             }`}>
               <Search className="w-4 h-4 text-sky-600 dark:text-sky-400" />
@@ -199,7 +201,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Search Results with Context Snippets */}
           {hasQuery && (
             <div className="space-y-4 pt-2 animate-in fade-in">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--velox-muted)]">
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-[var(--velox-muted)]">
                 <FileText className="w-3.5 h-3.5 text-sky-500" />
                 <span>Search Results with Context ({searchResults.length})</span>
               </div>
@@ -320,7 +322,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Quick Access (Pinned Documents) */}
         {!hasQuery && pinnedFiles.length > 0 && (
           <div className="space-y-3">
-            <div className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wider ${
+            <div className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wider ${
               isLight ? 'text-slate-700' : 'text-slate-300'
             }`}>
               <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />

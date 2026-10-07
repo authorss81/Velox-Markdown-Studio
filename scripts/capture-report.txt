@@ -1,1 +1,2 @@
-capture current: sha256=bbd5f60995e6e93e51882dec8a5a72922fd4ebea664d8e9224a64e1f427559d8 DIFFERS: 113/1232400 pixels (0.0092%)
+capture baseline [dark]: sha256=68b75799ed09a49b3475f0db476de2aa20cfa27857e19efb0d1bbf25c3a0d3e3
+capture baseline [light]: sha256=8f2eef877d64bcefdbe1dcbc5bb54ea9618171582664cf394fbe2612b95f0c4f

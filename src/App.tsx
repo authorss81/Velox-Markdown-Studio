@@ -301,6 +301,35 @@ export default function App() {
     );
   }, [theme]);
 
+  // Keep the header's right-hand reserve matched to the real native caption
+  // buttons. The CSS fallback (148px) covers standard widths, but DPI scaling
+  // and OS differences move the true width, and the theme toggle sits exactly
+  // at that boundary - close enough that rounding once slid it underneath.
+  useEffect(() => {
+    const overlay = (
+      window.navigator as Navigator & {
+        windowControlsOverlay?: { getTitlebarAreaRect: () => { width: number } };
+      }
+    ).windowControlsOverlay;
+    if (!overlay || typeof overlay.getTitlebarAreaRect !== 'function') return;
+
+    const syncReserve = () => {
+      try {
+        const rect = overlay.getTitlebarAreaRect();
+        const reserve = Math.max(0, window.innerWidth - rect.width + 10);
+        document.documentElement.style.setProperty(
+          '--velox-caption-reserve',
+          `${Math.ceil(reserve)}px`
+        );
+      } catch {
+        /* Fall back to the CSS value. */
+      }
+    };
+
+    syncReserve();
+    window.addEventListener('resize', syncReserve);
+    return () => window.removeEventListener('resize', syncReserve);
+  }, []);
   
 
   // Load permanent memory recent files on mount
@@ -897,6 +926,26 @@ export default function App() {
     );
   }, [activeTabId]);
 
+  // Reorder tabs by drag-and-drop or Alt+Arrow keys. Tabs previously had a fixed
+  // order with no way to rearrange them.
+  const handleMoveTab = useCallback(
+    (draggedId: string, targetId: string | null) => {
+      setTabs((prev) => {
+        const from = prev.findIndex((t) => t.fileId === draggedId);
+        if (from === -1) return prev;
+        const without = prev.filter((t) => t.fileId !== draggedId);
+        const moved = prev[from];
+        if (!moved) return prev;
+        if (targetId === null) return [moved, ...without];
+        const to = without.findIndex((t) => t.fileId === targetId);
+        if (to === -1) return prev;
+        without.splice(to, 0, moved);
+        return without;
+      });
+    },
+    []
+  );
+
   // Close a tab, refusing to silently discard unsaved work.
   //
   // This handler used to drop the tab unconditionally, so clicking the tab's ✕,
@@ -1197,10 +1246,11 @@ export default function App() {
         tabs={tabs}
         activeTabId={activeTabId}
         theme={theme}
-        onSelectTab={(id) => setActiveTabId(id)}
-        onCloseTab={handleCloseTab}
-        onNewTab={handleNewFile}
-      />
+          onSelectTab={(id) => setActiveTabId(id)}
+          onCloseTab={handleCloseTab}
+          onNewTab={handleNewFile}
+          onMoveTab={handleMoveTab}
+        />
 
       {/* Command Bar with Toolbar actions, working zoom, sync scroll toggle, and working export */}
       <CommandBar

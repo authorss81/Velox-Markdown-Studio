@@ -257,6 +257,55 @@ describe('table overflow contract', () => {
   });
 });
 
+describe('field-report round contract', () => {
+  it('routes generated blockquote color through theme CSS only', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'services', 'markdown.ts'),
+      'utf8'
+    );
+    const quote = src.match(/return `<blockquote class="([^"]*)"/)?.[1] ?? '';
+    expect(quote, 'blockquote classes present').not.toBe('');
+    expect(quote).not.toMatch(/text-(slate|sky)-\d+/);
+    expect(quote).not.toMatch(/bg-(slate|sky)-\d+/);
+  });
+
+  it('measures the caption reserve instead of guessing it', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), 'src', 'App.tsx'), 'utf8');
+    expect(src).toContain('getTitlebarAreaRect');
+    expect(src).toContain('--velox-caption-reserve');
+  });
+
+  it('reorders tabs by drag, keyboard and scroll chevrons', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const root = process.cwd();
+    const bar = fs.readFileSync(path.join(root, 'src', 'components', 'TabBar.tsx'), 'utf8');
+    const app = fs.readFileSync(path.join(root, 'src', 'App.tsx'), 'utf8');
+    expect(bar).toContain('onMoveTab');
+    expect(bar).toContain('draggable');
+    expect(bar).toContain('data-tabid');
+    expect(bar).toContain('scrollStrip');
+    expect(bar).toContain('ChevronLeft');
+    expect(bar).toContain('ChevronRight');
+    expect(app).toContain('handleMoveTab');
+    expect(app).toContain('onMoveTab={handleMoveTab}');
+  });
+
+  it('presents the hero mark on a dark tile in light mode', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'HomePage.tsx'),
+      'utf8'
+    );
+    expect(src).toContain("'bg-slate-900 border-slate-800'");
+  });
+});
+
 describe('radius scale contract', () => {
   it('snaps near-duplicate radii to the canonical steps', async () => {
     const fs = await import('node:fs');

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FileTab } from '../types';
-import { Home, Plus, X, FileText } from 'lucide-react';
+import { Home, Plus, X, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TabBarProps {
   tabs: FileTab[];
@@ -9,6 +9,7 @@ interface TabBarProps {
   onSelectTab: (fileId: string | null) => void;
   onCloseTab: (fileId: string) => void;
   onNewTab: () => void;
+  onMoveTab: (draggedId: string, targetId: string | null) => void;
 }
 
 export const TabBar: React.FC<TabBarProps> = ({
@@ -18,15 +19,73 @@ export const TabBar: React.FC<TabBarProps> = ({
   onSelectTab,
   onCloseTab,
   onNewTab,
+  onMoveTab,
 }) => {
   const isLight = theme === 'light';
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [canScroll, setCanScroll] = useState({ left: false, right: false });
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const dragId = useRef<string | null>(null);
+
+  // Show scroll arrows only when the strip actually overflows. The strip hides
+  // its scrollbar (no-scrollbar), so without these - and without wheel mapping
+  // below - tabs past the edge were unreachable.
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const sync = () => {
+      setCanScroll({
+        left: strip.scrollLeft > 4,
+        right: strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 4,
+      });
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, [tabs.length, activeTabId]);
+
+  const scrollStrip = (dir: 1 | -1) => {
+    stripRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+  };
 
   return (
+    <div className="flex items-center">
+      {canScroll.left && (
+        <button
+          type="button"
+          onClick={() => scrollStrip(-1)}
+          aria-label="Scroll tabs left"
+          className={`shrink-0 w-7 h-[42px] flex items-center justify-center transition ${
+            isLight ? 'text-slate-600 hover:bg-slate-200' : 'text-slate-400 hover:bg-slate-800'
+          }`}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+      )}
     <div
+      ref={stripRef}
       role="tablist"
       aria-label="Open documents"
+      onScroll={() => {
+        const strip = stripRef.current;
+        if (!strip) return;
+        setCanScroll({
+          left: strip.scrollLeft > 4,
+          right: strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 4,
+        });
+      }}
+      onWheel={(e) => {
+        // A vertical wheel over a horizontal strip otherwise does nothing, which
+        // is why overflowing tabs felt unreachable.
+        const strip = stripRef.current;
+        if (strip && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          strip.scrollLeft += e.deltaY;
+        }
+      }}
       onKeyDown={(e) => {
         // Roving focus across tabs; arrows also select, matching click.
+        // Alt+arrows reorder the focused tab instead of moving focus.
         if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
         const items = Array.from(
           e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')
@@ -34,9 +93,17 @@ export const TabBar: React.FC<TabBarProps> = ({
         const at = items.indexOf(document.activeElement as HTMLElement);
         if (at === -1) return;
         e.preventDefault();
-        const next = items[(at + (e.key === 'ArrowRight' ? 1 : -1) + items.length) % items.length];
-        next?.focus();
-        next?.click();
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        const next = items[(at + dir + items.length) % items.length];
+        if (!next) return;
+        if (e.altKey) {
+          const draggedId = (document.activeElement as HTMLElement | null)?.dataset.tabid;
+          const targetId = next.dataset.tabid ?? null;
+          if (draggedId && draggedId !== targetId) onMoveTab(draggedId, targetId);
+          return;
+        }
+        next.focus();
+        next.click();
       }}
       className={`h-[42px] border-b flex items-center px-4 gap-1.5 overflow-x-auto select-none no-scrollbar transition-colors duration-150 ${
         isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'
@@ -65,6 +132,7 @@ export const TabBar: React.FC<TabBarProps> = ({
       {/* Document tabs */}
       {tabs.map((tab) => {
         const isActive = activeTabId === tab.fileId;
+        const isDropTarget = dropTargetId === tab.fileId;
         return (
           <div
             key={tab.fileId}
@@ -72,6 +140,34 @@ export const TabBar: React.FC<TabBarProps> = ({
             aria-selected={isActive}
             aria-label={`${tab.name}${tab.isDirty ? ', unsaved changes' : ''}`}
             tabIndex={isActive ? 0 : -1}
+            data-tabid={tab.fileId}
+            draggable
+            onDragStart={(e) => {
+              dragId.current = tab.fileId;
+              e.dataTransfer.effectAllowed = 'move';
+              // Required for Firefox to fire dragover/drop.
+              e.dataTransfer.setData('text/plain', tab.fileId);
+            }}
+            onDragEnd={() => {
+              dragId.current = null;
+              setDropTargetId(null);
+            }}
+            onDragOver={(e) => {
+              if (!dragId.current || dragId.current === tab.fileId) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              setDropTargetId(tab.fileId);
+            }}
+            onDragLeave={() => {
+              setDropTargetId((prev) => (prev === tab.fileId ? null : prev));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const dragged = dragId.current ?? e.dataTransfer.getData('text/plain');
+              setDropTargetId(null);
+              if (dragged && dragged !== tab.fileId) onMoveTab(dragged, tab.fileId);
+              dragId.current = null;
+            }}
             onClick={() => onSelectTab(tab.fileId)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -99,7 +195,7 @@ export const TabBar: React.FC<TabBarProps> = ({
                 : isLight
                 ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-100/80'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-            }`}
+            } ${isDropTarget ? (isLight ? 'outline-2 outline-sky-600' : 'outline-2 outline-sky-400') : ''}`}
           >
             <FileText className={`w-4 h-4 flex-shrink-0 ${
               isActive
@@ -152,6 +248,19 @@ export const TabBar: React.FC<TabBarProps> = ({
       >
         <Plus className="w-4 h-4" />
       </button>
+    </div>
+      {canScroll.right && (
+        <button
+          type="button"
+          onClick={() => scrollStrip(1)}
+          aria-label="Scroll tabs right"
+          className={`shrink-0 w-7 h-[42px] flex items-center justify-center transition ${
+            isLight ? 'text-slate-600 hover:bg-slate-200' : 'text-slate-400 hover:bg-slate-800'
+          }`}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 };

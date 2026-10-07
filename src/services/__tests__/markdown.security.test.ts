@@ -127,6 +127,23 @@ describe('legitimate markdown still renders', () => {
     expect(parseMarkdown('> hello')).toMatch(/<blockquote[\s\S]*?<p>hello<\/p>/);
   });
 
+  it('emits no color utilities on theme-surfaced elements', () => {
+    // After the engine moved into @layer components, utilities beat theme rules
+    // regardless of specificity. A single text-slate-* class on a blockquote
+    // once rendered all light-mode quotes in near-white on near-white. Theme CSS
+    // owns color on surfaced elements now; markup owns structure. (The zoom chip,
+    // code header, copy button and pre body keep their utilities: those sit on
+    // fixed-dark chrome in both themes, by design.)
+    const html = parseMarkdown('> quoted\n\n![a](https://example.com/a.png)\n\n```js\nconst a = 1;\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |');
+    for (const tag of ['blockquote', 'figcaption', 'table', 'p>', '<li', '<h1', '<h2']) {
+      const opens = [...html.matchAll(new RegExp(`<${tag}[^>]*>`, 'g'))].map((m) => m[0]);
+      for (const open of opens) {
+        expect(open, tag).not.toMatch(/text-(slate|sky|amber|rose|emerald|white|black)-\d+/);
+        expect(open, tag).not.toMatch(/bg-(slate|sky|amber|rose|emerald|white|black)(-\d+)?(\/|"| )/);
+      }
+    }
+  });
+
   it('returns a safe message instead of throwing on hostile input', () => {
     // Deeply nested blockquotes previously drove unbounded re-entrant parsing.
     const nasty = '>'.repeat(400) + ' deep';

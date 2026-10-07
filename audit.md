@@ -4927,3 +4927,69 @@ Velox ratings: MISSING / WEAK / OK / STRONG.
 | Cross-file search + jump-to-line | STRONG (genuinely good) | WEAK | STRONG | WEAK | STRONG |
 
 Verdict: Velox's full-text search with line jump is its one STRONG differentiator. Everything a premium editor is judged on — editing surface, measure, GFM fidelity, outline, undo — is MISSING or WEAK. Close MD1, E1, E5, S3, U7 first; they are the gap between "viewer with a textarea" and "editor".
+
+
+---
+
+## 7. Field-report round - installed-build verification
+
+Findings below were reported against the installed application (not the source
+tree) after Phases 1-4, each reproduced or confirmed before fixing. Severity and
+format follow the rest of this report. Status: FIXED unless noted.
+
+### [CRITICAL] V1. Light-mode blockquote text invisible
+- **Seen in:** installed app, light theme, any document containing a > quote
+- **Cause:** the markdown engine had moved into @layer components, where
+  utilities beat theme rules regardless of specificity. The blockquote renderer
+  emitted 	ext-slate-300, which the theme CSS could no longer override - so
+  light-mode quotes rendered near-white on near-white.
+- **User-visible impact:** quoted text unreadable in light mode; looked like
+  empty boxes.
+- **Fix:** generated markup owns structure only; theme CSS owns all color
+  (src/services/markdown.ts, src/index.css). Proven with computed styles in
+  both themes via Electron, and the pixel-proof fixture now mirrors real
+  renderer output in both themes so this class of regression is caught.
+
+### [HIGH] V2. Theme toggle hidden behind native caption buttons
+- **Seen in:** installed app, any DPI scaling that rounds the 140px reserve down
+- **Cause:** the Window Controls Overlay draws ~138px of caption buttons over
+  the header, and the reserve left ~2px of clearance.
+- **User-visible impact:** the Light/Dark toggle slid underneath Minimize.
+- **Fix:** reserve raised to 148px, plus a runtime measurement via
+  
+avigator.windowControlsOverlay.getTitlebarAreaRect() that sets the exact
+  reserve on mount and resize (src/App.tsx), with the CSS value as fallback.
+
+### [HIGH] V3. Double-clicking a .md opened the app but not the file
+- **Seen in:** installed app after a correct file association
+- **Cause:** Windows passes the path as argv, and nothing consumed it: no
+  process.argv handling, no single-instance lock, no renderer delivery path.
+- **User-visible impact:** the app opened to Home with the document discarded.
+- **Fix:** validated argv extraction, single-instance lock with second-instance
+  forwarding, a pending-open queue consumed on mount or pushed live, and a
+  narrow elox.app bridge (lectron/ipc.cjs, lectron/main.cjs,
+  lectron/preload.cjs, src/types/ipc.ts, src/App.tsx). Covered by argv
+  extraction cases and staged queued/pushed opens in the Electron smoke suite.
+
+### [HIGH] V4. Tabs could not be reordered and overflowed without recourse
+- **Seen in:** installed app with many open tabs
+- **Cause:** fixed order, and a scrollbar-hidden strip with no arrow buttons or
+  wheel mapping, so tabs past the edge were unreachable.
+- **User-visible impact:** no way to organize or reach tabs.
+- **Fix:** drag-and-drop reorder with drop indicator, Alt+Arrow keyboard move,
+  chevron buttons that appear only on overflow, and vertical-wheel mapping
+  (src/components/TabBar.tsx, handleMoveTab in src/App.tsx).
+
+### [MEDIUM] V5. Hero logo washed out in light mode
+- **Seen in:** installed app, Home, light theme
+- **Cause:** the mark's mid-blue gradients sit on a pale blue chip.
+- **User-visible impact:** logo barely visible.
+- **Fix:** light-mode chip is a dark tile, presenting the mark like an app icon.
+  No change in dark mode (src/components/HomePage.tsx).
+
+### [MEDIUM] V6. Home and toolbar labels too small
+- **Seen in:** installed app, Home hero and toolbar (Save/New)
+- **Cause:** 12px labels throughout.
+- **User-visible impact:** requested +1-2pt.
+- **Fix:** toolbar action labels and section headers to 14px, hero title already
+  at 30px. Data-density text (tables, metadata badges) intentionally unchanged.
