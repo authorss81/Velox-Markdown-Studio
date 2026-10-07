@@ -61,6 +61,7 @@ export interface AppSettings {
   wordWrap: boolean;
   lineNumbers: boolean;
   syncScroll: boolean;
+  showOutline: boolean;
   defaultViewMode: ViewMode;
   autoSave: boolean;
 }

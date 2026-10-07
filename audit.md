@@ -4993,3 +4993,39 @@ avigator.windowControlsOverlay.getTitlebarAreaRect() that sets the exact
 - **User-visible impact:** requested +1-2pt.
 - **Fix:** toolbar action labels and section headers to 14px, hero title already
   at 30px. Data-density text (tables, metadata badges) intentionally unchanged.
+
+---
+
+## 8. Outline sidebar (MD11) and service-worker closure (S6)
+
+### [MEDIUM] MD11 (remainder). No document outline or TOC navigation
+- **Seen in:** source tree - the engine emitted heading anchors (comment: "a
+  future outline clickable") but nothing consumed them; no outline code existed
+  in src/. Engine-side MD11 (strikethrough via marked, footnotes, definition
+  lists, heading anchors) was already closed; only the navigation surface was
+  missing.
+- **User-visible impact:** long documents had no way to see structure or jump
+  between sections.
+- **Fix:** the heading renderer records {depth, text, id} into the parse
+  context, exposed via parseMarkdownWithOutline; parseMarkdown delegates so
+  the export path is byte-identical. The panel reads recorded rows only - slugs
+  are never recomputed, so duplicate headings (intro, intro-1) stay in sync
+  by construction. Labels are plain text: renderer chrome (image overlays,
+  broken-image fallbacks, footnote numbers) is tagged data-outline-skip and
+  stripped before the tag-strip, while real captions stay. UI: an Outline pill
+  next to Sync Scroll (preview/split only), a 224px sidebar with depth-indent,
+  click-to-scroll scoped to the preview container (CSS.escape, no global id
+  lookup), active-section highlight via IntersectionObserver, reduced-motion
+  honoured, empty-document hint. Off by default and persisted like the other
+  view prefs, so the default layout is untouched.
+- **Tests:** slug-parity incl. duplicates, markup-stripped labels, empty-heading
+  placeholder, footnote-in-heading sync, html-identity with the plain parse;
+  toolbar/panel/scoping/persistence contracts.
+
+### [LOW] S6 (closure). Service worker had no runtime strategy
+- **Seen in:** ite.config.ts - egisterType was already 'prompt', but no
+  workbox block: remote preview images never cached, old precaches never
+  cleaned.
+- **Fix:** cleanupOutdatedCaches: true plus a bounded CacheFirst store (100
+  entries, 30 days) for remote images. No behaviour change in Electron, where
+  no service worker runs.

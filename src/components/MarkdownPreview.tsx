@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { FileText } from 'lucide-react';
-import { parseMarkdown } from '../services/markdown';
+import { parseMarkdownWithOutline } from '../services/markdown';
 import { ensureLanguages } from '../services/highlight';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { OutlinePanel } from './OutlinePanel';
 
 export interface MarkdownPreviewHandle {
   scrollToPercentage: (percentage: number) => void;
@@ -14,6 +15,9 @@ interface MarkdownPreviewProps {
   fontSize?: number;
   /** Compact padding for split mode so both text columns share a top edge. */
   compact?: boolean;
+  /** Whether the outline sidebar (MD11) is visible. Off by default. */
+  showOutline?: boolean;
+  onCloseOutline?: () => void;
   onImageClick?: (src: string, alt: string) => void;
   onContentChange?: (updatedContent: string) => void;
   onScrollPercentage?: (percentage: number) => void;
@@ -24,12 +28,15 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
   theme = 'dark',
   fontSize = 16,
   compact = false,
+  showOutline = false,
+  onCloseOutline,
   onImageClick,
   onContentChange,
   onScrollPercentage,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const copyTimer = useRef<number | null>(null);
+  const [activeHeadingId, setActiveHeadingId] = React.useState<string | null>(null);
 
   // highlight.js grammars are dynamically imported so they land in their own
   // chunks instead of bloating the bundle. That makes them arrive a moment after
@@ -56,10 +63,51 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
   // a fraction of a second.
   const debouncedContent = useDebouncedValue(content, 180);
 
-  const htmlContent = React.useMemo(
-    () => parseMarkdown(debouncedContent),
+  const { html: htmlContent, outline } = React.useMemo(
+    () => parseMarkdownWithOutline(debouncedContent),
     [debouncedContent, grammarEpoch]
   );
+
+  // Highlight the outline row for the section in view. Scoped to this preview
+  // container: heading ids like "introduction" must never match app chrome, so
+  // the observer and every lookup stay inside containerRef.
+  useEffect(() => {
+    if (!showOutline) {
+      setActiveHeadingId(null);
+      return;
+    }
+    const container = containerRef.current;
+    if (!container) return;
+    const headings = Array.from(
+      container.querySelectorAll('h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]')
+    );
+    if (headings.length === 0) {
+      setActiveHeadingId(null);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveHeadingId(entry.target.id);
+        }
+      },
+      { root: container, rootMargin: '-8% 0px -85% 0px', threshold: 0 }
+    );
+    headings.forEach((h) => observer.observe(h));
+    return () => observer.disconnect();
+  }, [htmlContent, showOutline]);
+
+  const jumpToHeading = React.useCallback((id: string) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const el = container.querySelector(`#${CSS.escape(id)}`);
+    if (!el) return;
+    setActiveHeadingId(id);
+    const reduceMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+  }, []);
 
   // Expose imperative scrollToPercentage
   useImperativeHandle(ref, () => ({
@@ -204,18 +252,29 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
   }
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      // Drives --preview-fs, which .markdown-body multiplies into its base size.
-      // An inline font-size here would only affect inheriting descendants, which
-      // is why zoom used to leave headings, code and tables untouched.
-      style={{ '--preview-fs': `${fontSize}px` } as React.CSSProperties}
-      className={`markdown-body ${compact ? 'px-4 py-4' : 'p-6 md:p-10'} max-w-4xl mx-auto h-full overflow-y-auto selection:bg-sky-500/30 ${
-        theme === 'light' ? 'selection:text-slate-900' : 'selection:text-white'
-      }`}
-      dangerouslySetInnerHTML={{ __html: htmlContent }}
-    />
+    <div className="flex h-full min-h-0 w-full">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        // Drives --preview-fs, which .markdown-body multiplies into its base size.
+        // An inline font-size here would only affect inheriting descendants, which
+        // is why zoom used to leave headings, code and tables untouched.
+        style={{ '--preview-fs': `${fontSize}px` } as React.CSSProperties}
+        className={`markdown-body ${compact ? 'px-4 py-4' : 'p-6 md:p-10'} max-w-4xl mx-auto h-full flex-1 min-w-0 overflow-y-auto selection:bg-sky-500/30 ${
+          theme === 'light' ? 'selection:text-slate-900' : 'selection:text-white'
+        }`}
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+      {showOutline && (
+        <OutlinePanel
+          outline={outline}
+          activeId={activeHeadingId}
+          theme={theme}
+          onJump={jumpToHeading}
+          onClose={onCloseOutline ?? (() => {})}
+        />
+      )}
+    </div>
   );
 });
 

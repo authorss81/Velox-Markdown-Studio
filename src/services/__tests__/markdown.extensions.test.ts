@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMarkdown } from '../markdown';
+import { parseMarkdown, parseMarkdownWithOutline } from '../markdown';
 
 /**
  * marked ships no footnotes, no definition lists and no heading anchors, so
@@ -89,5 +89,61 @@ describe('heading anchors', () => {
     for (const id of ids) {
       expect(id).toMatch(/^[\w-]+$/);
     }
+  });
+});
+
+describe('document outline', () => {
+  it('returns one row per heading with the exact rendered anchor', () => {
+    const { html, outline } = parseMarkdownWithOutline('# Intro\n\nSome text.\n\n## Details\n\n### Deep\n');
+    expect(outline).toEqual([
+      { depth: 1, text: 'Intro', id: 'intro' },
+      { depth: 2, text: 'Details', id: 'details' },
+      { depth: 3, text: 'Deep', id: 'deep' },
+    ]);
+    // Every row must match an anchor actually present in the HTML, so a click
+    // can never scroll to nowhere.
+    for (const row of outline) {
+      expect(html).toContain(`id="${row.id}"`);
+    }
+  });
+
+  it('keeps duplicate headings distinct in both the outline and the HTML', () => {
+    const { html, outline } = parseMarkdownWithOutline('# Same\n\n# Same\n');
+    expect(outline.map((r) => r.id)).toEqual(['same', 'same-1']);
+    expect(html).toContain('id="same"');
+    expect(html).toContain('id="same-1"');
+  });
+
+  it('strips markup from labels so the panel never receives raw HTML', () => {
+    const { outline } = parseMarkdownWithOutline('## A **bold** `code` ![pic](https://example.com/x.png) end');
+    expect(outline).toHaveLength(1);
+    // "Click to zoom" and "Image unavailable" are renderer chrome and must not
+    // leak; the caption ("pic") is the image's real description and stays.
+    expect(outline[0]?.text).toBe('A bold code pic end');
+    expect(outline[0]?.text).not.toContain('<');
+  });
+
+  it('labels an empty heading instead of emitting a blank row', () => {
+    const { outline } = parseMarkdownWithOutline('#\n');
+    expect(outline).toHaveLength(1);
+    expect(outline[0]?.text).toBe('(empty heading)');
+    expect(outline[0]?.id).toBe('section');
+  });
+
+  it('stays in sync when a heading contains a footnote reference', () => {
+    const { html, outline } = parseMarkdownWithOutline('## Title[^a]\n\nBody[^a].\n\n[^a]: Note.');
+    expect(outline).toHaveLength(1);
+    expect(html).toContain(`id="${outline[0]?.id}"`);
+    // The reference number is navigation chrome, not heading text.
+    expect(outline[0]?.text).toBe('Title');
+  });
+
+  it('returns an empty outline for a document without headings', () => {
+    expect(parseMarkdownWithOutline('Just a paragraph.\n').outline).toEqual([]);
+  });
+
+  it('leaves the html identical to the plain parse', () => {
+    const src = '# A\n\nText with **bold**.\n';
+    expect(parseMarkdownWithOutline(src).html).toBe(parseMarkdown(src));
   });
 });

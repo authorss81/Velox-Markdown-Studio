@@ -38,13 +38,13 @@ markedInstance.use({
         <figure class="my-4 flex flex-col items-center">
           <div class="relative group max-w-full overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/50 shadow-lg cursor-zoom-in transition-all duration-200 hover:border-sky-500/50">
             <img src="${safeHref}" ${altAttr}${titleAttr} class="max-w-full h-auto object-contain max-h-[500px] transition-transform duration-300 group-hover:scale-[1.01]" data-zoomable="true" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
-            <div class="absolute inset-0 bg-sky-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+            <div data-outline-skip class="absolute inset-0 bg-sky-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
               <span class="bg-slate-950/80 text-sky-300 text-xs px-2.5 py-1 rounded-full border border-sky-500/30 flex items-center gap-1 shadow-md">
                 Click to zoom
               </span>
             </div>
           </div>
-          <div class="md-img-fallback" role="img" aria-label="${escapeHtml(text || 'Markdown Image')}">Image unavailable</div>
+          <div data-outline-skip class="md-img-fallback" role="img" aria-label="${escapeHtml(text || 'Markdown Image')}">Image unavailable</div>
           ${caption}
         </figure>
       `;
@@ -174,20 +174,37 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 });
 
 export function parseMarkdown(markdown: string): string {
+  return parseMarkdownWithOutline(markdown).html;
+}
+
+/**
+ * One row of the document outline (MD11). `id` is the exact anchor the heading
+ * renderer emitted, so the outline panel can scroll to it without recomputing
+ * slugs and without risking a mismatch on duplicate headings.
+ */
+export interface OutlineEntry {
+  depth: number;
+  /** Plain-text label with markup stripped. Never empty; falls back to a placeholder. */
+  text: string;
+  id: string;
+}
+
+export function parseMarkdownWithOutline(markdown: string): { html: string; outline: OutlineEntry[] } {
   try {
     // Kick off (once) the on-demand grammar loads. Not awaited: the first render
     // must not block on ~27 dynamic imports, and any fence whose grammar has not
     // arrived yet simply renders as escaped plain text for a frame.
     void ensureLanguages();
-    parseContext = { footnoteOrder: [], footnoteDefs: new Map(), usedSlugs: new Map() };
+    parseContext = { footnoteOrder: [], footnoteDefs: new Map(), usedSlugs: new Map(), headings: [] };
     const rendered = markedInstance.parse(markdown) as string;
     const withFootnotes = appendFootnoteSection(rendered);
+    const outline = parseContext.headings;
     parseContext = null;
-    return DOMPurify.sanitize(withFootnotes, PURIFY_CONFIG);
+    return { html: DOMPurify.sanitize(withFootnotes, PURIFY_CONFIG), outline };
   } catch (err) {
     console.error('Markdown parse error:', err);
     parseContext = null;
-    return '<div class="text-rose-400 p-4">Error rendering markdown.</div>';
+    return { html: '<div class="text-rose-400 p-4">Error rendering markdown.</div>', outline: [] };
   }
 }
 
@@ -201,6 +218,8 @@ interface MarkdownParseContext {
   footnoteOrder: string[];
   footnoteDefs: Map<string, string>;
   usedSlugs: Map<string, number>;
+  /** Headings in render order; the outline panel reads these, never recomputes. */
+  headings: OutlineEntry[];
 }
 
 let parseContext: MarkdownParseContext | null = null;
@@ -326,7 +345,11 @@ markedInstance.use({
           n = ctx.footnoteOrder.length - 1;
         }
         const num = n + 1;
-        return `<sup class="footnote-ref" id="fnref-${num}"><a href="#fn-${num}">${num}</a></sup>`;
+        // data-outline-skip: the reference number is navigation chrome, not
+        // heading text — without this a "## Title[^a]" outline row reads
+        // "Title1". The attribute is renderer-private (stripped downstream if
+        // not allowlisted) and only outlineLabel consumes it.
+        return `<sup class="footnote-ref" data-outline-skip id="fnref-${num}"><a href="#fn-${num}">${num}</a></sup>`;
       },
     },
     {
@@ -377,12 +400,43 @@ markedInstance.use({
   renderer: {
     heading({ tokens, depth }: { tokens: Token[]; depth: number }) {
       // marked v18 ships no slugger, so headings carry no anchors. Identifiers
-      // make them linkable (and a future outline clickable) at zero visual cost.
+      // make them linkable (and the outline clickable) at zero visual cost.
       const inner = this.parser.parseInline(tokens);
-      return `<h${depth} id="${slugify(inner)}">${inner}</h${depth}>\n`;
+      const id = slugify(inner);
+      // Record the row for the outline panel. The label is plain text: the
+      // panel renders it with React, so raw inline HTML must never reach it
+      // (an <img> in a heading would otherwise inject markup/attributes).
+      if (parseContext) {
+        const text = outlineLabel(inner);
+        parseContext.headings.push({ depth, text, id });
+      }
+      return `<h${depth} id="${id}">${inner}</h${depth}>\n`;
     },
   },
 });
+
+/**
+ * Plain-text label for an outline row. Small regex-based strip plus the five
+ * entities marked can emit here — no DOM dependency, so this also runs in the
+ * export path and in tests without a document.
+ */
+function outlineLabel(html: string): string {
+  const text = html
+    // Drop renderer chrome first (image overlays, broken-image fallbacks,
+    // footnote reference numbers): they are text nodes in the heading's inner
+    // HTML and a plain tag-strip would leak them into the label. Backreference
+    // pairs the close tag; none of these elements nests itself.
+    .replace(/<(\w+)[^>]*\bdata-outline-skip\b[^>]*>.*?<\/\1>/gs, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text || '(empty heading)';
+}
 
 export function calculateWordCount(text: string): number {
   if (!text) return 0;

@@ -52,6 +52,23 @@ export default defineConfig(() => {
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
+        // S6: the worker previously ran on precache defaults with no runtime
+        // strategy, so remote preview images were never cached and superseded
+        // precaches were never cleaned. Images get a bounded CacheFirst store;
+        // everything else stays precache-only with outdated caches purged.
+        workbox: {
+          cleanupOutdatedCaches: true,
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/.*\.(?:png|jpe?g|gif|webp|avif|svg)$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'velox-remote-images',
+                expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 3600 },
+              },
+            },
+          ],
+        },
         manifest: {
           id: '/',
           name: 'Velox Markdown Studio',

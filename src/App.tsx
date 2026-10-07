@@ -67,6 +67,9 @@ export default function App() {
   const [fontSize, setFontSize] = useState(16);
   const [wordWrap, setWordWrap] = useState(true);
   const [syncScroll, setSyncScroll] = useState(true);
+  // Outline sidebar (MD11). Off by default so the layout is unchanged until
+  // the user opens it; persisted like the other view preferences.
+  const [showOutline, setShowOutline] = useState(false);
 
   // Whole-window zoom in the desktop app, per-pane scaling in a browser tab.
   //
@@ -257,6 +260,7 @@ export default function App() {
     setFontSize(settings.fontSize || 16);
     setWordWrap(settings.wordWrap !== false);
     setSyncScroll(settings.syncScroll !== false);
+    setShowOutline(settings.showOutline === true);
 
     const root = document.documentElement;
     root.classList.remove('dark', 'light');
@@ -1264,6 +1268,13 @@ export default function App() {
           persistViewPrefs({ syncScroll: next });
           showToast(`Sync Scroll ${next ? 'Enabled' : 'Disabled'}`);
         }}
+        showOutline={showOutline}
+        onToggleOutline={() => {
+          const next = !showOutline;
+          setShowOutline(next);
+          persistViewPrefs({ showOutline: next });
+          showToast(`Outline ${next ? 'Shown' : 'Hidden'}`);
+        }}
         onChangeViewMode={handleChangeViewMode}
         onNewFile={handleNewFile}
         onOpenFile={handleOpenLocalFile}
@@ -1353,6 +1364,11 @@ export default function App() {
                     content={activeTab.content}
                     fontSize={paneFontSize}
                     theme={theme}
+                    showOutline={showOutline}
+                    onCloseOutline={() => {
+                      setShowOutline(false);
+                      persistViewPrefs({ showOutline: false });
+                    }}
                     onContentChange={handleContentChange}
                     onImageClick={(src, alt) => setLightboxImage({ src, alt })}
                   />
@@ -1409,6 +1425,11 @@ export default function App() {
                       fontSize={paneFontSize}
                       theme={theme}
                       compact
+                      showOutline={showOutline}
+                      onCloseOutline={() => {
+                        setShowOutline(false);
+                        persistViewPrefs({ showOutline: false });
+                      }}
                       onContentChange={handleContentChange}
                       onScrollPercentage={handlePreviewScrollPercentage}
                       onImageClick={(src, alt) => setLightboxImage({ src, alt })}

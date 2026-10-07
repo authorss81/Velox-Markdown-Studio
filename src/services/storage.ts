@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   wordWrap: true,
   lineNumbers: true,
   syncScroll: true,
+  showOutline: false,
   defaultViewMode: 'preview',
   autoSave: true,
 };

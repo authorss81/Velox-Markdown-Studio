@@ -575,3 +575,59 @@ describe('editor and shell contract', () => {
     expect(src).toContain('minHeight: 640');
   });
 });
+
+describe('outline contract', () => {
+  it('toggles the panel from the toolbar only where a preview exists', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const bar = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'CommandBar.tsx'),
+      'utf8'
+    );
+    expect(bar).toContain('showOutline');
+    expect(bar).toContain('onToggleOutline');
+    expect(bar).toContain('aria-pressed={showOutline}');
+    expect(bar).toContain("viewMode !== 'raw'");
+    expect(bar).toContain('ListTree');
+  });
+
+  it('keeps the panel accessible: landmark, current-row state, close control', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const panel = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'OutlinePanel.tsx'),
+      'utf8'
+    );
+    expect(panel).toContain('aria-label="Document outline"');
+    expect(panel).toContain('aria-current');
+    expect(panel).toContain('aria-label="Close outline"');
+    expect(panel).toContain('No headings in this document.');
+  });
+
+  it('scopes heading lookups to the preview container and honours reduced motion', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const preview = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'MarkdownPreview.tsx'),
+      'utf8'
+    );
+    expect(preview).toContain('parseMarkdownWithOutline');
+    expect(preview).toContain('CSS.escape');
+    expect(preview).toContain('prefers-reduced-motion');
+    expect(preview).toContain('IntersectionObserver');
+    expect(preview).toContain('container.querySelector');
+  });
+
+  it('persists the outline preference and defaults it off', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const root = process.cwd();
+    const types = fs.readFileSync(path.join(root, 'src', 'types', 'index.ts'), 'utf8');
+    const storage = fs.readFileSync(path.join(root, 'src', 'services', 'storage.ts'), 'utf8');
+    const app = fs.readFileSync(path.join(root, 'src', 'App.tsx'), 'utf8');
+    expect(types).toContain('showOutline: boolean');
+    expect(storage).toContain('showOutline: false');
+    expect(app).toContain('settings.showOutline === true');
+    expect(app).toContain('persistViewPrefs({ showOutline: next })');
+  });
+});

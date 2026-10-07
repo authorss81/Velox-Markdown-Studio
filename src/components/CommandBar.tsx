@@ -27,6 +27,7 @@ import {
   Keyboard,
   Link2,
   Unlink2,
+  ListTree,
 } from 'lucide-react';
 import { ViewMode } from '../types';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -37,6 +38,8 @@ interface CommandBarProps {
   wordWrap?: boolean;
   syncScroll?: boolean;
   onToggleSyncScroll?: () => void;
+  showOutline?: boolean;
+  onToggleOutline?: () => void;
   onChangeViewMode: (mode: ViewMode) => void;
   onNewFile: () => void;
   onOpenFile: () => void;
@@ -59,6 +62,8 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   wordWrap = true,
   syncScroll = true,
   onToggleSyncScroll,
+  showOutline = false,
+  onToggleOutline,
   onChangeViewMode,
   onNewFile,
   onOpenFile,
@@ -278,6 +283,27 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                 <Unlink2 className="w-4 h-4 text-slate-400" />
               )}
               <span>Sync Scroll: {syncScroll ? 'On' : 'Off'}</span>
+            </button>
+          )}
+
+          {/* Outline Toggle (MD11): the sidebar lives in the preview, so the
+              toggle only appears where a preview exists. Same pill treatment
+              as Sync Scroll so the two view options read as a pair. */}
+          {viewMode !== 'raw' && onToggleOutline && (
+            <button
+              onClick={onToggleOutline}
+              aria-pressed={showOutline}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition ${
+                showOutline
+                  ? 'bg-sky-500/20 text-sky-400 border-sky-500/40 font-semibold'
+                  : isLight
+                  ? 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={`Document Outline: ${showOutline ? 'Shown' : 'Hidden'}`}
+            >
+              <ListTree className={`w-4 h-4 ${showOutline ? 'text-sky-400' : 'text-slate-400'}`} />
+              <span>Outline: {showOutline ? 'On' : 'Off'}</span>
             </button>
           )}
 
